@@ -11,10 +11,12 @@ class Settings(BaseSettings):
     app_name: str = "The Last Mile: AI on Public Rails"
     environment: str = "dev"
     database_url: str = "sqlite:///./lastmile.db"
+    auto_create_schema: bool = True  # dev convenience; production runs `alembic upgrade head`
     jwt_secret: str = "dev-only-change-me-synthetic-prototype"
     jwt_algorithm: str = "HS256"
     access_token_minutes: int = 30
     refresh_token_minutes: int = 60 * 24 * 7
+    bcrypt_rounds: int = 10
     rate_limit_capacity: int = 20
     rate_limit_refill_per_sec: float = 5.0
     cors_origins: str = "http://localhost:3000"

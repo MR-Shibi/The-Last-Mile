@@ -1,17 +1,32 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api import admin, audit, auth, cases, consents, mock_dpi, schemes
 from app.core.config import get_settings
+from app.core.database import init_db
+from app.core.middleware import AuditorReadOnlyMiddleware
 
 settings = get_settings()
 
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    if settings.auto_create_schema:
+        init_db()
+    yield
+
+
 app = FastAPI(
     title=settings.app_name,
-    version="0.1.0",
+    version="0.2.0",
     description=f"{settings.prototype_banner}. Multi-tenant, consent-gated public-service rails.",
     docs_url="/docs",
     openapi_url="/openapi.json",
+    lifespan=lifespan,
 )
+app.add_middleware(AuditorReadOnlyMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in settings.cors_origins.split(",")],
@@ -19,6 +34,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+for r in (auth.router, cases.router, consents.router, audit.router, admin.router, mock_dpi.router, schemes.router):
+    app.include_router(r)
 
 
 @app.get("/health", tags=["system"])
