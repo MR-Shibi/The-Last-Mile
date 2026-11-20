@@ -25,8 +25,8 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="ur" dir="rtl" className={`${geistSans.variable} ${nastaliq.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col">
+    <html lang="ur" dir="rtl" suppressHydrationWarning className={`${geistSans.variable} ${nastaliq.variable} h-full antialiased`}>
+      <body className="min-h-full flex flex-col" suppressHydrationWarning>
         <LanguageProvider>
           <main className="flex-1 pb-14">{children}</main>
           <PrototypeFooter />

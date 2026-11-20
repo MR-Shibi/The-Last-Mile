@@ -24,14 +24,17 @@ export default function Home() {
         </div>
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
           {CARDS.map((c) => (
-            <Link key={c.href} href={c.href} className={`${c.color} flex min-h-36 items-center gap-4 rounded-3xl p-5 text-white shadow-lg`}>
-              <span className="text-6xl" aria-hidden>{c.icon}</span>
-              <span className="flex-1">
-                <span className="block text-2xl font-bold">{lang === "ur" ? c.ur : c.en}</span>
-                <span className="block text-lg opacity-90">{lang === "ur" ? c.sub_ur : c.sub_en}</span>
-              </span>
-              <SpeakButton text={c.ur} textEn={c.en} />
-            </Link>
+            // Speaker is a sibling of the Link (not inside it), so tapping it can never navigate.
+            <div key={c.href} className="relative">
+              <Link href={c.href} className={`${c.color} flex min-h-[168px] items-center gap-4 rounded-3xl p-5 pe-20 text-white shadow-lg`}>
+                <span className="shrink-0 text-6xl" aria-hidden>{c.icon}</span>
+                <span className="flex min-w-0 flex-1 flex-col gap-3">
+                  <span className="urdu-title block text-2xl font-bold break-words">{lang === "ur" ? c.ur : c.en}</span>
+                  <span className="urdu-body block text-lg opacity-90 break-words">{lang === "ur" ? c.sub_ur : c.sub_en}</span>
+                </span>
+              </Link>
+              <SpeakButton text={c.ur} textEn={c.en} className="absolute end-4 top-1/2 -translate-y-1/2" />
+            </div>
           ))}
         </div>
         <div className="mt-8 rounded-2xl border-2 border-gray-300 p-4">

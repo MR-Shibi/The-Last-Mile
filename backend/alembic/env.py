@@ -8,13 +8,13 @@ from sqlalchemy import engine_from_config, pool
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import app.models  # noqa: E402,F401  (register models)
-from app.core.config import get_settings  # noqa: E402
+from app.core.config import get_settings, normalize_database_url  # noqa: E402
 from app.core.database import Base  # noqa: E402
 
 config = context.config
 # DATABASE_URL (env / .env) wins over alembic.ini; tests may pass -x url=...
-url = context.get_x_argument(as_dictionary=True).get("url") or get_settings().database_url
-config.set_main_option("sqlalchemy.url", url)
+url = normalize_database_url(context.get_x_argument(as_dictionary=True).get("url") or get_settings().database_url)
+config.set_main_option("sqlalchemy.url", url.replace("%", "%%"))  # escape % in passwords for configparser
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)

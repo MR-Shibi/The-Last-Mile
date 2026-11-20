@@ -1,0 +1,11 @@
+# Railway config (alternative to Render). Add a PostgreSQL plugin and reference it as DATABASE_URL;
+# set FRONTEND_URL and JWT_SECRET in the service variables. PROTOTYPE — synthetic data only.
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "backend/Dockerfile"
+
+[deploy]
+startCommand = "sh -c 'alembic upgrade head && python scripts/seed_demo.py --families 40 && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}'"
+healthcheckPath = "/health"
+healthcheckTimeout = 120
+restartPolicyType = "ON_FAILURE"

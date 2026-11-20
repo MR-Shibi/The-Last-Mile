@@ -38,15 +38,18 @@ function CitizenHome() {
       </div>
       <div className="mt-4 grid gap-4">
         {schemes.map((s) => (
-          <button key={s.id} onClick={() => setActive(s)} className="flex items-center gap-4 rounded-3xl border-4 border-black bg-white p-5 text-start shadow">
-            <span className="text-6xl" aria-hidden>{ICONS[s.icon] || "🤲"}</span>
-            <span className="flex-1">
-              <span className="block text-2xl font-bold">{lang === "ur" ? s.name_ur : s.name_en}</span>
-              <span className="block text-lg">{lang === "ur" ? s.description_ur : s.description_en}</span>
-              <span className="block text-xl font-bold text-ok" dir="ltr">Rs {s.amount_pkr.toLocaleString()}</span>
-            </span>
-            <SpeakButton text={`${s.name_ur}۔ ${s.description_ur}`} textEn={`${s.name_en}. ${s.description_en}`} size="lg" />
-          </button>
+          <div key={s.id} className="relative">
+            <button onClick={() => setActive(s)} className="flex min-h-[168px] w-full items-center gap-4 rounded-3xl border-4 border-black bg-white p-5 pe-24 text-start shadow">
+              <span className="shrink-0 text-6xl" aria-hidden>{ICONS[s.icon] || "🤲"}</span>
+              <span className="flex min-w-0 flex-1 flex-col gap-3">
+                <span className="urdu-title block text-2xl font-bold">{lang === "ur" ? s.name_ur : s.name_en}</span>
+                <span className="urdu-body block text-lg">{lang === "ur" ? s.description_ur : s.description_en}</span>
+                <span className="block text-xl font-bold text-ok" dir="ltr">Rs {s.amount_pkr.toLocaleString()}</span>
+              </span>
+            </button>
+            <SpeakButton text={`${s.name_ur}۔ ${s.description_ur}`} textEn={`${s.name_en}. ${s.description_en}`} size="lg"
+              className="absolute end-4 top-1/2 -translate-y-1/2" />
+          </div>
         ))}
         {!schemes.length && <p className="text-lg">{L("Loading…", "لوڈ ہو رہا ہے…")}</p>}
       </div>

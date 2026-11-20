@@ -1,0 +1,32 @@
+# Render Blueprint — PROTOTYPE — Simulated DPI & Synthetic Data Only.
+# Backend (Docker) + managed PostgreSQL 16. Deploy the frontend separately on Vercel
+# (root directory: frontend, env NEXT_PUBLIC_API_URL=https://<this-service>.onrender.com).
+services:
+  - type: web
+    name: lastmile-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /health
+    dockerCommand: sh -c "alembic upgrade head && python scripts/seed_demo.py --families 40 && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"
+    envVars:
+      - key: DATABASE_URL            # postgres://... is normalised to postgresql+psycopg:// by the app
+        fromDatabase:
+          name: lastmile-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: FRONTEND_URL            # comma-separated, e.g. https://last-mile.vercel.app
+        sync: false
+      - key: CORS_ORIGIN_REGEX       # optional: allow Vercel preview deployments
+        value: https://.*\.vercel\.app
+      - key: ENVIRONMENT
+        value: production
+
+databases:
+  - name: lastmile-db
+    databaseName: lastmile
+    user: lastmile
+    plan: free
+    postgresMajorVersion: "16"

@@ -30,11 +30,30 @@ body {
   font-size: 18px;
 }
 
-/* Urdu (RTL) gets Nastaliq with generous line-height so glyphs never clip */
+/* Urdu (RTL) gets Nastaliq. Its tall ascenders/descenders need far more leading than Latin text,
+ * so these unlayered rules deliberately beat Tailwind's per-size line-heights (text-xl etc.). */
 html[dir="rtl"] body,
 .urdu {
   font-family: var(--font-urdu), "Noto Nastaliq Urdu", serif;
-  line-height: 2.1;
+  line-height: 1.9;
+}
+html[dir="rtl"] :is(p, span, li, label, a, button, input, textarea, select, td, th, blockquote, div),
+.urdu-body {
+  line-height: 1.9;
+}
+html[dir="rtl"] :is(h1, h2, h3, h4, h5, h6, .urdu-title),
+.urdu-title {
+  line-height: 2.15;
+}
+/* Inputs and buttons need vertical room so descenders are not clipped by borders */
+html[dir="rtl"] :is(input, textarea, select) {
+  padding-top: 0.6em;
+  padding-bottom: 0.6em;
+}
+/* LTR islands inside Urdu pages (CNIC numbers, PINs, code) keep normal leading */
+html[dir="rtl"] [dir="ltr"],
+html[dir="rtl"] [dir="ltr"] * {
+  line-height: 1.5;
 }
 
 button:focus-visible,

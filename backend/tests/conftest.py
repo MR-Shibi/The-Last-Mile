@@ -5,7 +5,9 @@ from pathlib import Path
 
 # Must be configured before the app (and its engine) is imported.
 _TMP = Path(tempfile.mkdtemp(prefix="lastmile-test-"))
-os.environ["DATABASE_URL"] = f"sqlite:///{(_TMP / 'test.db').as_posix()}"
+# Default: throwaway SQLite. Set TEST_DATABASE_URL (e.g. postgres://user@host:5432/lastmile_test) to run the
+# whole suite against PostgreSQL; that database is wiped and recreated at session start.
+os.environ["DATABASE_URL"] = os.environ.get("TEST_DATABASE_URL") or f"sqlite:///{(_TMP / 'test.db').as_posix()}"
 os.environ["BCRYPT_ROUNDS"] = "4"
 os.environ["AUTO_CREATE_SCHEMA"] = "false"
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -18,6 +20,13 @@ from app.main import app  # noqa: E402
 from app.services import faults  # noqa: E402
 from app.services.seed import DEMO_PASSWORD, seed  # noqa: E402
 
+if os.environ.get("TEST_DATABASE_URL"):
+    from sqlalchemy import text
+
+    from app.core.database import engine
+
+    with engine.begin() as _conn:  # fresh schema (DROP SCHEMA also removes the append-only trigger)
+        _conn.execute(text("DROP SCHEMA public CASCADE; CREATE SCHEMA public;"))
 init_db()
 with SessionLocal() as _db:
     SEED = seed(_db, families=5)

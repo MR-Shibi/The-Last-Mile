@@ -6,7 +6,7 @@ import { useLang } from "@/lib/i18n";
 import { enqueue, newClientEventId, saveDraft } from "@/lib/offlineDb";
 import ConsentPanel from "@/components/ConsentPanel";
 import Parchi from "@/components/Parchi";
-import SpeakButton from "@/components/SpeakButton";
+import SpeakButton, { speak } from "@/components/SpeakButton";
 import VoiceInput from "@/components/VoiceInput";
 import { notifyOutboxChanged } from "@/components/AppHeader";
 
@@ -76,7 +76,7 @@ export default function ApplyWizard({ scheme, citizenUserId, onCancel }: { schem
       const qs = data.cnic ? `?cnic=${encodeURIComponent(String(data.cnic))}` : "";
       const v = await api<VisionResult>(`/vision/check${qs}`, { form });
       setVision(v);
-      if (!v.ok_to_submit) void new Audio(`/audio/${lang}/retake_photo.mp3`).play().catch(() => undefined);
+      if (!v.ok_to_submit) void speak({ audioKey: "retake_photo", lang });
     } catch {
       /* the server re-checks on submit anyway */
     }

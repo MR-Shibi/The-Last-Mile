@@ -9,7 +9,7 @@ Built for **Coder's Cup 2026** (48-hour hackathon). Not a chatbot: server-side R
 ---
 
 ## Contents
-1. [Architecture](#architecture) · 2. [Setup](#setup) · 3. [Test credentials](#test-credentials) · 4. [Real vs. Simulated](#real-vs-simulated) · 5. [Decision engine & threshold derivation](#decision-engine--threshold-derivation) · 6. [Evaluation results](#evaluation-results) · 7. [Live demo](#live-demo) · 8. [Limitations](#honest-limitations) · 9. [API map](#api-map)
+1. [Architecture](#architecture) · 2. [Setup](#setup) · [Deployment](#deployment) · 3. [Test credentials](#test-credentials) · 4. [Real vs. Simulated](#real-vs-simulated) · 5. [Decision engine & threshold derivation](#decision-engine--threshold-derivation) · 6. [Evaluation results](#evaluation-results) · 7. [Live demo](#live-demo) · 8. [Limitations](#honest-limitations) · 9. [API map](#api-map)
 
 ---
 
@@ -76,7 +76,16 @@ python scripts/generate_eval_cases.py && python scripts/run_eval.py
 python scripts/verify_demo_script.py                           # against the running server
 ```
 
-**SQLite is the default** (zero setup). For PostgreSQL: `docker compose up -d db`, set `DATABASE_URL` from `.env.example`, then `alembic upgrade head` (or let the dev server create the schema). Optional tooling: `python scripts/generate_voice_assets.py --force` regenerates the Urdu/English prompt MP3s (needs internet once).
+**SQLite is the default** (zero setup). For PostgreSQL: `docker compose up -d db`, set `DATABASE_URL` from `.env.example`, then `alembic upgrade head` (or let the dev server create the schema). `postgres://` and `postgresql://` URLs are normalised to the psycopg 3 driver automatically. To run the whole test suite on Postgres: `TEST_DATABASE_URL=postgres://user@host:5432/lastmile_test python -m pytest` (that database is wiped). Optional tooling: `python scripts/generate_voice_assets.py --force` regenerates the Urdu/English prompt MP3s (needs internet once).
+
+## Deployment
+
+| Piece | Where | How |
+|---|---|---|
+| Backend + PostgreSQL 16 | **Render** (`render.yaml` Blueprint) or **Railway** (`railway.toml`) | Docker image from `backend/Dockerfile`, built from the repo root. Each boot runs `alembic upgrade head && python scripts/seed_demo.py --families 40 && uvicorn …`; migrations and seeding are idempotent, so restarts never create duplicates. |
+| Frontend PWA | **Vercel** | Root directory `frontend`, framework Next.js, env `NEXT_PUBLIC_API_URL=https://<your-backend-host>` (see `frontend/.env.example`). |
+
+Backend environment variables: `DATABASE_URL` (provider URL as-is), `JWT_SECRET` (long random), `FRONTEND_URL` (comma-separated deployed origins, e.g. `https://last-mile.vercel.app`), optional `CORS_ORIGIN_REGEX` (e.g. `https://.*\.vercel\.app` for preview deployments). `http://localhost:3000` and `http://127.0.0.1:3000` are always allowed. The image bundles the Urdu/English prompt MP3s and pre-downloads the RapidOCR models, so neither needs network at runtime.
 
 ## Test credentials
 
@@ -104,7 +113,7 @@ Family PINs (shared-phone unlock/consent) follow the seed rule `family N → f"{
 | Cost-gated decision engine | **Real** | Deterministic math; explanations + full trace |
 | Fuzzy name matching | **Real** | RapidFuzz Jaro-Winkler + Urdu normalisation + phonetic skeleton |
 | Blur / glare / dark detection, QR decode, image-hash reuse | **Real** | OpenCV on the actual pixels |
-| OCR | **Real** (RapidOCR ONNX) | Tesseract not required. Test fixtures may embed deterministic OCR text for speed |
+| OCR | **Real** (RapidOCR 3, ONNX) | Tesseract not required. Test fixtures may embed deterministic OCR text for speed |
 | Forgery detection | **Partly real** | Editing-software metadata + QR/registry + hash reuse are real; the ELA heuristic is weak on synthetic cards and only nudges scores |
 | Scam Shield classifier + RAG | **Real model, synthetic data** | TF-IDF + LogisticRegression trained on 205 synthetic SMS; extractive RAG over simulated policy markdown |
 | Anomaly model | **Real model, synthetic data** | IsolationForest on a synthetic applicant population |
@@ -204,8 +213,9 @@ These numbers come from synthetic data that the same team generated. Treat them 
 * **Voice.** STT depends on the browser's Web Speech API (not available on all phones/offline); dynamic TTS needs internet (pre-cached prompts do not).
 * **Helper auto-lock and the 40-family switcher are client-side UX.** The server still enforces consent on every request, but a stolen unlocked phone can act within the 2-minute window.
 * **In-memory state.** Rate limiter and fault switches are per-process (single-instance prototype); production needs Redis or similar.
-* **Untested on PostgreSQL in CI.** All automated tests ran on SQLite; the Postgres schema and triggers are provided but were not exercised here.
-* **Frontend flows were verified by build, lint and API e2e tests, not by automated browser tests.**
+* **PostgreSQL verified locally, not in CI.** The suite (118 DB-backed tests), Alembic migrations, idempotent re-seeding across two simulated boots, the append-only trigger and the 23-step demo were run against PostgreSQL 16.13; the default CI-style run uses SQLite.
+* **Docker image not built in this environment** (no Docker available). The dependency set was resolved for Linux x86-64 on Python 3.11–3.14 (wheels only), but the first real build happens on your host/Render.
+* **Frontend flows were verified by build, lint and API e2e tests, not by automated browser tests.** Bugs found in manual browser testing (Urdu line-height, speaker taps navigating, dictation cutting off) were fixed in code; re-check them on a real phone.
 
 ## API map
 

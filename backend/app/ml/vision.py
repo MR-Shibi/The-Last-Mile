@@ -59,7 +59,10 @@ def _rapidocr():
     global _ocr_engine
     with _ocr_lock:
         if _ocr_engine is None:
-            from rapidocr_onnxruntime import RapidOCR  # noqa: PLC0415
+            try:
+                from rapidocr import RapidOCR  # noqa: PLC0415  (maintained 3.x package, Python 3.11-3.14)
+            except ImportError:
+                from rapidocr_onnxruntime import RapidOCR  # noqa: PLC0415  (legacy 1.x package)
             _ocr_engine = RapidOCR()
         return _ocr_engine
 
@@ -186,14 +189,17 @@ def run_ocr(img: np.ndarray, meta: dict) -> CnicExtraction:
     if mode == "fixture":
         return extract_fields([], 0.0, "none")
     try:
-        result, _ = _rapidocr()(img)
+        out = _rapidocr()(img)
     except Exception:  # noqa: BLE001
         return extract_fields([], 0.0, "rapidocr-error")
-    if not result:
+    if hasattr(out, "txts"):  # rapidocr >= 2: RapidOCROutput(txts, scores, boxes)
+        lines, scores = list(out.txts or ()), [float(x) for x in (out.scores or ())]
+    else:  # rapidocr_onnxruntime 1.x: ([box, text, score], ...), elapse
+        result = out[0] or []
+        lines, scores = [r[1] for r in result], [float(r[2]) for r in result]
+    if not lines:
         return extract_fields([], 0.0, "rapidocr")
-    lines = [r[1] for r in result]
-    conf = float(np.mean([float(r[2]) for r in result]))
-    return extract_fields(lines, conf, "rapidocr")
+    return extract_fields(lines, float(np.mean(scores)), "rapidocr")
 
 
 def analyze_document(data: bytes) -> dict:

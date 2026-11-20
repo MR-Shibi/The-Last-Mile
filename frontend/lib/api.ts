@@ -2,7 +2,7 @@
 import { useMemo } from "react";
 import { useStorageValue, writeStorage } from "@/lib/stores";
 
-export const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
+export const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export type Role = "citizen" | "community_helper" | "department_officer" | "platform_admin" | "auditor";
 

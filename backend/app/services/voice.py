@@ -9,13 +9,15 @@
   mandatory confirmation read-back. Whisper is not bundled (kept lightweight; see README).
 """
 import hashlib
+import os
 import re
 from pathlib import Path
 
 from app.services.cnic import normalize_cnic
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-AUDIO_DIR = REPO_ROOT / "frontend" / "public" / "audio"
+# Pre-cached prompts live with the PWA; containers copy them in (override with VOICE_ASSETS_DIR).
+AUDIO_DIR = Path(os.environ.get("VOICE_ASSETS_DIR") or REPO_ROOT / "frontend" / "public" / "audio")
 TTS_CACHE = REPO_ROOT / "backend" / ".tts_cache"
 
 PROMPTS: dict[str, dict[str, str]] = {

@@ -1,0 +1,14 @@
+.git
+.venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/*.db
+**/.tts_cache
+.env
+frontend/node_modules
+frontend/.next
+frontend/app
+frontend/components
+frontend/lib
+!frontend/public/audio
