@@ -30,12 +30,12 @@ ENGINE_ROUTES = (AUTO_RECOMMEND, ASK_MORE_PROOF, ESCALATE_HUMAN)
 # Flags that always force a human ("I am not sure") handoff.
 ESCALATION_FLAGS = {"hard_rule_failed", "tamper_suspected", "qr_mismatch", "duplicate_cnic", "duplicate_document",
                     "duplicate_registry_record", "dpi_timeout", "prompt_injection", "not_in_registry",
-                    "negative_income", "document_identity_mismatch"}
+                    "negative_income", "document_identity_mismatch", "identity_mismatch"}
 # Gaps the citizen can fix themselves (retake photo, fill a field).
 FIXABLE_FLAGS = {"missing_field", "blurry_photo", "glare_photo", "dark_photo", "low_ocr", "document_missing",
                  "invalid_cnic_format"}
 # Soft anomaly flags block AUTO but do not by themselves force escalation.
-SOFT_ANOMALY_FLAGS = {"statistical_outlier"}
+SOFT_ANOMALY_FLAGS = {"statistical_outlier", "forensic_signal"}
 
 
 def composite_probability(rule_score: float, identity_match_score: float, document_score: float,
@@ -113,6 +113,8 @@ REASON_TEXT = {
     "negative_income": ("The income amount looks incorrect.", "آمدنی کی رقم درست نہیں لگتی۔"),
     "name_spelling_conflict": ("Your name is spelled differently in official records.", "سرکاری ریکارڈ میں آپ کے نام کی ہجے مختلف ہے۔"),
     "document_identity_mismatch": ("The CNIC on the photo does not match the number you gave.", "تصویر والا شناختی کارڈ نمبر آپ کے بتائے گئے نمبر سے نہیں ملتا۔"),
+    "identity_mismatch": ("The name does not match the official record for this CNIC.", "یہ نام اس شناختی کارڈ کے سرکاری ریکارڈ سے نہیں ملتا۔"),
+    "forensic_signal": ("Your photo shows signs of editing. Please send a fresh, unedited photo.", "تصویر میں تبدیلی کے آثار ہیں۔ براہ کرم نئی، اصل تصویر بھیجیں۔"),
     "low_confidence": ("We are not sure about some details.", "ہمیں کچھ معلومات کے بارے میں یقین نہیں ہے۔"),
 }
 

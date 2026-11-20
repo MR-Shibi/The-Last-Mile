@@ -55,6 +55,8 @@ def assess_identity(db: Session, data: dict, *, honour_faults: bool = True) -> d
         if best is None or cand["score"] > best["score"]:
             best = cand
     flags: list[str] = []
+    if best["name_score"] < 0.72:  # matcher's "different person" band: an officer must look, never "send more proof"
+        flags.append("identity_mismatch")
     return {**base, "identity_match_score": best["score"], "flags": flags, "status": "FOUND",
             "best_match": best, "registry_duplicates": res["duplicate_records"],
             "name_scores": [s for s in (best["name_score"], best["father_score"]) if s is not None]}

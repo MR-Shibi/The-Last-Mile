@@ -1,0 +1,185 @@
+{
+ "generated_at": "2026-11-20T17:37:57+00:00",
+ "runtime_seconds": 50.6,
+ "total": 546,
+ "passed": 546,
+ "pass_rate": 1.0,
+ "never_auto_reject": true,
+ "by_family": [
+  {
+   "family": "01_name_variants",
+   "total": 42,
+   "passed": 42,
+   "pass_rate": 1.0,
+   "failures": []
+  },
+  {
+   "family": "02_duplicates",
+   "total": 42,
+   "passed": 42,
+   "pass_rate": 1.0,
+   "failures": []
+  },
+  {
+   "family": "03_missing_data",
+   "total": 42,
+   "passed": 42,
+   "pass_rate": 1.0,
+   "failures": []
+  },
+  {
+   "family": "04_wrong_data",
+   "total": 42,
+   "passed": 42,
+   "pass_rate": 1.0,
+   "failures": []
+  },
+  {
+   "family": "05_bad_photos",
+   "total": 42,
+   "passed": 42,
+   "pass_rate": 1.0,
+   "failures": []
+  },
+  {
+   "family": "06_forged_docs",
+   "total": 42,
+   "passed": 42,
+   "pass_rate": 1.0,
+   "failures": []
+  },
+  {
+   "family": "07_scam_messages",
+   "total": 42,
+   "passed": 42,
+   "pass_rate": 1.0,
+   "failures": []
+  },
+  {
+   "family": "08_weak_network",
+   "total": 42,
+   "passed": 42,
+   "pass_rate": 1.0,
+   "failures": []
+  },
+  {
+   "family": "09_speech_noise",
+   "total": 42,
+   "passed": 42,
+   "pass_rate": 1.0,
+   "failures": []
+  },
+  {
+   "family": "10_rule_changes",
+   "total": 42,
+   "passed": 42,
+   "pass_rate": 1.0,
+   "failures": []
+  },
+  {
+   "family": "11_consent",
+   "total": 42,
+   "passed": 42,
+   "pass_rate": 1.0,
+   "failures": []
+  },
+  {
+   "family": "12_security",
+   "total": 42,
+   "passed": 42,
+   "pass_rate": 1.0,
+   "failures": []
+  },
+  {
+   "family": "13_ai_failures",
+   "total": 42,
+   "passed": 42,
+   "pass_rate": 1.0,
+   "failures": []
+  }
+ ],
+ "threshold_analysis": [
+  {
+   "threshold": 0.75,
+   "wrong_approvals": 0,
+   "wrongly_blocked_eligible": 14,
+   "eligible_delayed_by_proof": 104,
+   "human_review_load": 132,
+   "slow_proof_requests": 110,
+   "total_expected_cost": 257.0
+  },
+  {
+   "threshold": 0.85,
+   "wrong_approvals": 0,
+   "wrongly_blocked_eligible": 14,
+   "eligible_delayed_by_proof": 104,
+   "human_review_load": 132,
+   "slow_proof_requests": 110,
+   "total_expected_cost": 257.0
+  },
+  {
+   "threshold": 0.9,
+   "wrong_approvals": 0,
+   "wrongly_blocked_eligible": 14,
+   "eligible_delayed_by_proof": 104,
+   "human_review_load": 132,
+   "slow_proof_requests": 110,
+   "total_expected_cost": 257.0
+  },
+  {
+   "threshold": 0.95,
+   "wrong_approvals": 0,
+   "wrongly_blocked_eligible": 14,
+   "eligible_delayed_by_proof": 104,
+   "human_review_load": 132,
+   "slow_proof_requests": 110,
+   "total_expected_cost": 257.0
+  },
+  {
+   "threshold": 0.98,
+   "wrong_approvals": 0,
+   "wrongly_blocked_eligible": 14,
+   "eligible_delayed_by_proof": 108,
+   "human_review_load": 132,
+   "slow_proof_requests": 114,
+   "total_expected_cost": 259.0
+  }
+ ],
+ "optimal_threshold": 0.95,
+ "cost_weights": {
+  "wrong_approval": 20.0,
+  "wrong_block": 5.0,
+  "human_review": 1.0,
+  "slow_proof": 0.5
+ },
+ "scam_metrics": {
+  "n": 42,
+  "true_positive": 17,
+  "false_positive": 0,
+  "true_negative": 14,
+  "false_negative": 0,
+  "uncertain_scam": 9,
+  "uncertain_legit": 2,
+  "precision": 1.0,
+  "recall_flagged_as_scam": 0.6538,
+  "recall_incl_human_review": 1.0,
+  "false_alarm_rate": 0.0,
+  "legit_sent_to_review_rate": 0.125,
+  "missed_scam_rate": 0.0
+ },
+ "forensics_metrics": {
+  "n": 84,
+  "true_positive": 70,
+  "false_positive": 0,
+  "true_negative": 14,
+  "false_negative": 0,
+  "precision": 1.0,
+  "recall": 1.0,
+  "false_alarm_rate": 0.0
+ },
+ "engine_cases_in_cost_analysis": 280,
+ "notes": [
+  "Synthetic cohort, deliberately including borderline genuine (p 0.95-0.98) and subtle-forgery (p 0.87-0.94) cases; the threshold comparison illustrates the cost trade-off and is not a real-world accuracy claim.",
+  "Scam test messages use phrasings held out from the classifier's training templates."
+ ]
+}

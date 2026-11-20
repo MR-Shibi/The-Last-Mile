@@ -8,14 +8,16 @@ import threading
 import numpy as np
 from sklearn.ensemble import IsolationForest
 
-MODEL_VERSION = "iforest-v1-seed2026"
+MODEL_VERSION = "iforest-v2-seed2026"
 _lock = threading.Lock()
 _model: dict | None = None
 
 
 def _population(n: int = 2000, seed: int = 2026) -> np.ndarray:
     rng = np.random.default_rng(seed)
-    income = np.clip(rng.normal(19000, 8000, n), 0, 80000)
+    # Broad, roughly uniform income band so eligible incomes near any cap are NOT outliers (v1 bias fix);
+    # only implausible values (negative, extreme) stand out.
+    income = np.concatenate([rng.uniform(0, 70000, int(n * 0.8)), np.clip(rng.normal(20000, 9000, n - int(n * 0.8)), 0, None)])
     age = rng.uniform(18, 80, n)
     dependents = rng.poisson(2.5, n).clip(0, 10)
     return np.column_stack([income, age, dependents])

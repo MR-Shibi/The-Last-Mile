@@ -201,5 +201,5 @@ def test_frontend_production_build_has_zero_type_errors():
     out = res.stdout + res.stderr
     assert res.returncode == 0, out[-4000:]
     assert "Type error" not in out and "Failed to compile" not in out
-    for route in ("/citizen", "/helper", "/scam", "/officer", "/admin", "/auditor"):
+    for route in ("/citizen", "/helper", "/scam", "/officer", "/admin", "/auditor", "/eval"):
         assert route in out, f"route {route} missing from build output"

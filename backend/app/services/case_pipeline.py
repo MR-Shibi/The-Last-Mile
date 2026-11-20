@@ -8,6 +8,7 @@ from app.models import Case, Decision, Document, RuleVersion, User
 from app.services import faults
 from app.services.decision_engine import decide
 from app.services.identity import assess_identity
+from app.services.cnic import is_valid_cnic, normalize_cnic
 from app.services.rules_engine import active_rule_version, evaluate_rules, facts_from_case
 
 VISION_VERSION = "vision-metadata-v1"
@@ -36,6 +37,8 @@ def assess_document(db: Session, case: Case | None, data: dict, *, honour_faults
         flags.append("low_ocr")
     if forgery >= 0.6:
         flags.append("tamper_suspected")
+    elif forgery >= 0.1:
+        flags.append("forensic_signal")  # weak edit signal: never auto-recommend, ask for a fresh photo
     if quality < 0.5 and not {"blurry_photo", "glare_photo", "dark_photo"} & set(flags):
         flags.append("blurry_photo")
     return {"document_score": round(ocr * quality * (1 - forgery), 4), "ocr_confidence": ocr, "quality_score": quality,
@@ -44,10 +47,10 @@ def assess_document(db: Session, case: Case | None, data: dict, *, honour_faults
 
 
 def duplicate_counts(db: Session, case: Case | None, data: dict) -> tuple[int, int]:
-    cnic = data.get("cnic")
+    cnic = normalize_cnic(data.get("cnic"))
     citizen_id = case.citizen_user_id if case else None
     dup_cnic = 0
-    if cnic:
+    if cnic and is_valid_cnic(cnic):  # malformed numbers typed by different people are not "duplicates"
         q = select(func.count(func.distinct(Case.citizen_user_id))).where(Case.cnic == cnic)
         if citizen_id is not None:
             q = q.where(Case.citizen_user_id != citizen_id)
