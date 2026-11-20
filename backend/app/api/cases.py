@@ -79,7 +79,20 @@ def create_case_record(db: Session, user: User, body: CaseIn) -> tuple[Case, boo
                 payload={"citizen_user_id": citizen.id, "scheme_id": scheme.id,
                          "client_event_id": body.client_event_id}, commit=False)
     db.commit()
+    from app.services.case_pipeline import evaluate_case  # local import avoids a cycle
+
+    evaluate_case(db, case, actor=user)
     return case, True
+
+
+def latest_decision(db: Session, case_id: int) -> dict | None:
+    from app.models import Decision
+
+    d = db.execute(select(Decision).where(Decision.case_id == case_id).order_by(Decision.id.desc()).limit(1)).scalar()
+    if not d:
+        return None
+    return {"id": d.id, "route": d.route, "probability": d.probability, "reason_user_en": d.reason_user_en,
+            "reason_user_ur": d.reason_user_ur, "rule_version_id": d.rule_version_id, "decided_by": d.decided_by}
 
 
 @router.post("", status_code=201)
@@ -88,6 +101,7 @@ def create_case(body: CaseIn, user: User = Depends(require_roles(Role.CITIZEN, R
     case, created = create_case_record(db, user, body)
     out = case_out(case, set(ConsentScope.ALL) if user.role == Role.CITIZEN else active_scopes(db, case.citizen_user_id), user.role)
     out["idempotent_replay"] = not created
+    out["decision"] = latest_decision(db, case.id)
     return out
 
 
