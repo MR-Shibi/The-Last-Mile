@@ -1,0 +1,18 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: lastmile-postgres
+    environment:
+      POSTGRES_USER: lastmile
+      POSTGRES_PASSWORD: lastmile_dev_only
+      POSTGRES_DB: lastmile
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lastmile"]
+      interval: 5s
+      retries: 10
+volumes:
+  pgdata:
