@@ -30,7 +30,7 @@ ENGINE_ROUTES = (AUTO_RECOMMEND, ASK_MORE_PROOF, ESCALATE_HUMAN)
 # Flags that always force a human ("I am not sure") handoff.
 ESCALATION_FLAGS = {"hard_rule_failed", "tamper_suspected", "qr_mismatch", "duplicate_cnic", "duplicate_document",
                     "duplicate_registry_record", "dpi_timeout", "prompt_injection", "not_in_registry",
-                    "negative_income"}
+                    "negative_income", "document_identity_mismatch"}
 # Gaps the citizen can fix themselves (retake photo, fill a field).
 FIXABLE_FLAGS = {"missing_field", "blurry_photo", "glare_photo", "dark_photo", "low_ocr", "document_missing",
                  "invalid_cnic_format"}
@@ -112,6 +112,7 @@ REASON_TEXT = {
     "not_in_registry": ("We could not find this CNIC in official records.", "یہ شناختی کارڈ سرکاری ریکارڈ میں نہیں ملا۔"),
     "negative_income": ("The income amount looks incorrect.", "آمدنی کی رقم درست نہیں لگتی۔"),
     "name_spelling_conflict": ("Your name is spelled differently in official records.", "سرکاری ریکارڈ میں آپ کے نام کی ہجے مختلف ہے۔"),
+    "document_identity_mismatch": ("The CNIC on the photo does not match the number you gave.", "تصویر والا شناختی کارڈ نمبر آپ کے بتائے گئے نمبر سے نہیں ملتا۔"),
     "low_confidence": ("We are not sure about some details.", "ہمیں کچھ معلومات کے بارے میں یقین نہیں ہے۔"),
 }
 

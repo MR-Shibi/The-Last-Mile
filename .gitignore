@@ -8,3 +8,4 @@ node_modules/
 .next/
 out/
 backend/app/ml/artifacts/*.joblib
+backend/.tts_cache/
