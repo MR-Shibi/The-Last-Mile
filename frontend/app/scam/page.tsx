@@ -1,0 +1,87 @@
+"use client";
+
+import { useState } from "react";
+import AppHeader from "@/components/AppHeader";
+import SpeakButton from "@/components/SpeakButton";
+import { api } from "@/lib/api";
+import { useLang } from "@/lib/i18n";
+
+interface Citation { source: string; document: string; section: string; snippet: string }
+interface ScamResult { verdict: string; color: "red" | "yellow" | "green"; probability: number; reasons_en: string[]; reasons_ur: string[]; citations: Citation[]; injection_detected: boolean }
+
+const STYLE = {
+  red: { bg: "bg-danger", icon: "⛔", en: "SCAM — do not pay", ur: "دھوکہ — رقم نہ بھیجیں", audio: "scam_warning" },
+  yellow: { bg: "bg-warn", icon: "⚠️", en: "NOT SURE — call the helpline first", ur: "یقین نہیں — پہلے ہیلپ لائن پر فون کریں", audio: null },
+  green: { bg: "bg-ok", icon: "✅", en: "Looks official", ur: "سرکاری لگتا ہے", audio: "safe_message" },
+} as const;
+
+/** Shopkeeper Scam Shield: paste or speak an SMS -> big verdict card + Urdu reasons + official source. */
+export default function ScamShield() {
+  const { lang, L } = useLang();
+  const [text, setText] = useState("");
+  const [res, setRes] = useState<ScamResult | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function check() {
+    if (!text.trim()) return;
+    setBusy(true);
+    try {
+      const r = await api<ScamResult>("/scam/check", { body: { text } });
+      setRes(r);
+      const audio = STYLE[r.color].audio;
+      if (audio) void new Audio(`/audio/${lang}/${audio}.mp3`).play().catch(() => undefined);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function dictate() {
+    const W = window as unknown as { webkitSpeechRecognition?: new () => { lang: string; onresult: (e: { results: { 0: { 0: { transcript: string } } } }) => void; start: () => void } };
+    if (!W.webkitSpeechRecognition) return;
+    const r = new W.webkitSpeechRecognition();
+    r.lang = lang === "ur" ? "ur-PK" : "en-US";
+    r.onresult = (e) => setText(e.results[0][0].transcript);
+    r.start();
+  }
+
+  const s = res ? STYLE[res.color] : null;
+  return (
+    <>
+      <AppHeader title={L("Scam Shield", "دھوکہ ڈھال")} />
+      <div className="mx-auto max-w-xl px-4 py-6">
+        <h1 className="text-3xl font-bold">🛡️ {L("Is this payment SMS real?", "کیا یہ ادائیگی کا پیغام اصلی ہے؟")}</h1>
+        <textarea value={text} onChange={(e) => setText(e.target.value)} rows={5} placeholder={L("Paste the SMS here", "پیغام یہاں چسپاں کریں")} className="mt-4 w-full rounded-2xl border-4 border-black p-4 text-xl" />
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <button onClick={dictate} className="rounded-2xl border-4 border-black bg-white py-4 text-xl font-bold">🎤 {L("Speak", "بولیں")}</button>
+          <button disabled={busy} onClick={() => void check()} className="rounded-2xl bg-brand py-4 text-xl font-bold text-white disabled:opacity-50">{busy ? "…" : L("Check", "چیک کریں")}</button>
+        </div>
+        {res && s && (
+          <div className="mt-6" role="status" aria-live="polite">
+            <div className={`${s.bg} flex items-center gap-4 rounded-3xl p-6 text-white`}>
+              <span className="text-6xl" aria-hidden>{s.icon}</span>
+              <div className="flex-1">
+                <div className="text-3xl font-bold">{lang === "ur" ? s.ur : s.en}</div>
+                <div className="text-sm opacity-90" dir="ltr">{res.verdict} · risk {(res.probability * 100).toFixed(0)}%</div>
+              </div>
+              <SpeakButton audioKey={s.audio} text={res.reasons_ur.join(" ")} textEn={res.reasons_en.join(" ")} size="lg" />
+            </div>
+            <ul className="mt-4 space-y-2 text-xl">
+              {(lang === "ur" ? res.reasons_ur : res.reasons_en).map((r) => <li key={r}>• {r}</li>)}
+            </ul>
+            {res.citations.length > 0 && (
+              <div className="mt-4 rounded-2xl border-2 border-gray-400 bg-gray-50 p-4" dir="ltr">
+                <p className="font-bold">📘 Official source</p>
+                {res.citations.map((c) => (
+                  <blockquote key={c.source + c.section} className="mt-2 border-s-4 border-brand ps-3">
+                    <div className="text-sm font-bold">{c.document} › {c.section} <span className="font-mono text-xs">({c.source})</span></div>
+                    <p className="text-base">{c.snippet}</p>
+                  </blockquote>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </>
+  );
+}

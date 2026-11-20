@@ -3,7 +3,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import admin, ai, audit, auth, cases, consents, decisions, mock_dpi, rules, schemes
+from app.api import (admin, ai, audit, auth, cases, consents, decisions, helper, mock_dpi, officer, receipts,
+                     rules, schemes, sync)
 from app.core.config import get_settings
 from app.core.database import init_db
 from app.core.middleware import AuditorReadOnlyMiddleware
@@ -36,7 +37,8 @@ app.add_middleware(
 )
 
 for r in (auth.router, cases.router, consents.router, audit.router, admin.router, mock_dpi.router, schemes.router,
-          rules.router, decisions.router, ai.router):
+          rules.router, decisions.router, ai.router, sync.router, helper.router, officer.router,
+          receipts.router):
     app.include_router(r)
 
 

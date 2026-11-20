@@ -4,7 +4,7 @@
  */
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
 
-export type OutboxKind = "case_submit" | "draft" | "voice_transcript" | "consent";
+export type OutboxKind = "case_submit" | "draft" | "voice_transcript" | "consent_grant";
 
 export interface OutboxItem {
   client_event_id: string;
@@ -41,8 +41,8 @@ export function newClientEventId(): string {
   return `evt-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-export async function enqueue(kind: OutboxKind, payload: Record<string, unknown>, family_id?: number): Promise<OutboxItem> {
-  const item: OutboxItem = { client_event_id: newClientEventId(), kind, payload, created_at: Date.now(), attempts: 0, family_id };
+export async function enqueue(kind: OutboxKind, payload: Record<string, unknown>, family_id?: number, client_event_id?: string): Promise<OutboxItem> {
+  const item: OutboxItem = { client_event_id: client_event_id || newClientEventId(), kind, payload, created_at: Date.now(), attempts: 0, family_id };
   const db = await getDb();
   await db.put("outbox", item);
   return item;

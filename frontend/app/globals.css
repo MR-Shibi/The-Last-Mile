@@ -43,3 +43,11 @@ input:focus-visible {
   outline: 4px solid #facc15;
   outline-offset: 2px;
 }
+
+/* Parchi printing: only the receipt, high contrast */
+@media print {
+  header, footer, .no-print { display: none !important; }
+  body * { visibility: hidden; }
+  .parchi, .parchi * { visibility: visible; }
+  .parchi { position: absolute; inset: 0; margin: 0 auto; }
+}

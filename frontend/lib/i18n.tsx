@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo } from "react";
+import { useStorageValue, writeStorage } from "@/lib/stores";
 
 export type Lang = "ur" | "en";
 
@@ -18,21 +19,13 @@ const DICT = {
 
 export type DictKey = keyof typeof DICT;
 
-type Ctx = { lang: Lang; dir: "rtl" | "ltr"; setLang: (l: Lang) => void; toggle: () => void; t: (k: DictKey) => string };
+type Ctx = { lang: Lang; dir: "rtl" | "ltr"; setLang: (l: Lang) => void; toggle: () => void; t: (k: DictKey) => string; L: (en: string, ur: string) => string };
 
 const LanguageContext = createContext<Ctx | null>(null);
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [lang, setLangState] = useState<Lang>("ur");
-
-  useEffect(() => {
-    try {
-      const saved = window.localStorage.getItem("lm.lang");
-      if (saved === "en" || saved === "ur") setLangState(saved);
-    } catch {
-      /* storage unavailable: keep default */
-    }
-  }, []);
+  const saved = useStorageValue("lm.lang");
+  const lang: Lang = saved === "en" ? "en" : "ur";
 
   useEffect(() => {
     const dir = lang === "ur" ? "rtl" : "ltr";
@@ -40,14 +33,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     document.documentElement.dir = dir;
   }, [lang]);
 
-  const setLang = useCallback((l: Lang) => {
-    setLangState(l);
-    try {
-      window.localStorage.setItem("lm.lang", l);
-    } catch {
-      /* ignore */
-    }
-  }, []);
+  const setLang = useCallback((l: Lang) => writeStorage("lm.lang", l), []);
 
   const value = useMemo<Ctx>(
     () => ({
@@ -56,6 +42,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
       setLang,
       toggle: () => setLang(lang === "ur" ? "en" : "ur"),
       t: (k) => DICT[k][lang],
+      L: (en, ur) => (lang === "ur" ? ur : en),
     }),
     [lang, setLang],
   );
