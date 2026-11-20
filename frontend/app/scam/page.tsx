@@ -78,7 +78,7 @@ export default function ScamShield() {
         {dict.error && <p className="mt-2 font-bold text-danger">{dict.error === "unsupported" ? L("Voice input is not supported in this browser — paste or use a sample.", "اس براؤزر میں آواز ممکن نہیں — پیغام چسپاں کریں یا نمونہ استعمال کریں۔") : L("Could not hear you. Try again.", "آواز سنائی نہیں دی۔ دوبارہ کوشش کریں۔")}</p>}
         {res && s && (
           <div className="mt-6" role="status" aria-live="polite">
-            <div className={`${s.bg} flex items-center gap-4 rounded-3xl p-6 text-white`}>
+            <div data-testid="scam-verdict" data-verdict={res.verdict} className={`${s.bg} flex items-center gap-4 rounded-3xl p-6 text-white`}>
               <span className="text-6xl" aria-hidden>{s.icon}</span>
               <div className="flex-1">
                 <div className="text-3xl font-bold">{lang === "ur" ? s.ur : s.en}</div>

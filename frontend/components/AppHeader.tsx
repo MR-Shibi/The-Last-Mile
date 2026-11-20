@@ -58,7 +58,7 @@ export default function AppHeader({ title }: { title?: string }) {
           ● {online ? t("online") : t("offline")}
         </span>
         {pending > 0 && (
-          <button onClick={() => void trySync()} className="rounded-full bg-yellow-300 px-3 py-1 text-sm font-bold text-black" title={L("Pending uploads", "بھیجنے کے منتظر")}>
+          <button data-testid="outbox-badge" onClick={() => void trySync()} className="rounded-full bg-yellow-300 px-3 py-1 text-sm font-bold text-black" title={L("Pending uploads", "بھیجنے کے منتظر")}>
             ⏳ {pending}
           </button>
         )}

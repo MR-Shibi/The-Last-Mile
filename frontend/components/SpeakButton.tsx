@@ -82,6 +82,7 @@ export default function SpeakButton({ audioKey, text, textEn, size = "md", label
   return (
     <button
       type="button"
+      data-testid="speak-button"
       onMouseDown={block}
       onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => {

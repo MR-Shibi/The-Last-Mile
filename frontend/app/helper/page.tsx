@@ -98,7 +98,7 @@ function HelperMode() {
   return (
     <>
       {/* Persistent active-family banner */}
-      <div className={`sticky top-12 z-30 -mx-4 mb-4 flex items-center gap-3 px-4 py-3 text-white ${active ? (active.can_act ? "bg-ok" : "bg-warn") : "bg-gray-700"}`} role="status">
+      <div data-testid="family-banner" className={`sticky top-12 z-30 -mx-4 mb-4 flex items-center gap-3 px-4 py-3 text-white ${active ? (active.can_act ? "bg-ok" : "bg-warn") : "bg-gray-700"}`} role="status">
         <span className="text-3xl" aria-hidden>👤</span>
         <div className="flex-1">
           <div className="text-xl font-bold">{active ? active.full_name : L("No family open", "کوئی خاندان کھلا نہیں")}</div>
@@ -116,7 +116,7 @@ function HelperMode() {
           <ul className="mt-3 max-h-96 space-y-2 overflow-y-auto">
             {shown.map((f) => (
               <li key={f.citizen_user_id}>
-                <button onClick={() => { setPinFor(f); setErr(null); }} className="flex w-full items-center gap-3 rounded-xl border-2 border-gray-400 p-3 text-start">
+                <button data-testid={`family-${f.citizen_user_id}`} onClick={() => { setPinFor(f); setErr(null); }} className="flex w-full items-center gap-3 rounded-xl border-2 border-gray-400 p-3 text-start">
                   <span className="flex-1 text-lg font-bold">{f.full_name}</span>
                   <span className="font-mono" dir="ltr">••••{f.cnic_last4}</span>
                   <span className={`rounded-full px-2 py-0.5 text-sm font-bold text-white ${f.consent.helper_access ? "bg-ok" : "bg-gray-500"}`}>

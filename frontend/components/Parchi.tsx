@@ -17,12 +17,12 @@ export default function Parchi({ r }: { r: Receipt }) {
   const { lang, L } = useLang();
   const b = BADGE[r.color] || BADGE.blue;
   return (
-    <div className="parchi mx-auto max-w-md rounded-3xl border-[6px] border-black bg-white p-5 text-black">
+    <div data-testid="parchi" className="parchi mx-auto max-w-md rounded-3xl border-[6px] border-black bg-white p-5 text-black">
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-2xl font-bold">{L("Your Parchi", "آپ کی پرچی")}</h2>
         <SpeakButton audioKey={r.audio_key} text={r.reason_ur || r.status_ur} textEn={r.reason_en || r.status_en} size="lg" />
       </div>
-      <div className={`mt-3 flex items-center gap-3 rounded-2xl ${b.bg} p-4 text-white`}>
+      <div data-testid="parchi-badge" data-color={r.color} className={`mt-3 flex items-center gap-3 rounded-2xl ${b.bg} p-4 text-white`}>
         <span className="text-4xl" aria-hidden>{b.icon}</span>
         <div>
           <div className="text-sm font-bold opacity-90">{lang === "ur" ? b.ur : b.en}</div>
@@ -33,7 +33,7 @@ export default function Parchi({ r }: { r: Receipt }) {
         <QRCodeSVG value={r.qr} size={150} level="M" includeMargin aria-label="Parchi QR" />
         <div>
           <div className="text-sm">{L("PIN", "پن")}</div>
-          <div className="font-mono text-4xl font-bold tracking-widest" dir="ltr">{r.pin}</div>
+          <div data-testid="parchi-pin" className="font-mono text-4xl font-bold tracking-widest" dir="ltr">{r.pin}</div>
           <div className="mt-2 text-sm" dir="ltr">{r.reference}</div>
         </div>
       </div>

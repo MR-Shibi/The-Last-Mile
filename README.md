@@ -76,6 +76,18 @@ python scripts/generate_eval_cases.py && python scripts/run_eval.py
 python scripts/verify_demo_script.py                           # against the running server
 ```
 
+**Real-browser E2E (Playwright, headless Chromium).** `cd frontend && npx playwright install chromium && npm run test:e2e`. Playwright starts its own servers on dedicated ports (API :8010 on a fresh, freshly-seeded throwaway database; production PWA build on :3010), so it never touches a dev server on 3000/8000. The 7 tests in `frontend/tests/e2e_browser.spec.ts` cover:
+
+- Urdu/English RTL layout with bounding-box overlap checks on desktop and phone widths
+- speaker buttons that must not navigate and must request audio
+- the citizen application with the `Muhammed` spelling variant, blurry-then-clean CNIC upload and the QR Parchi
+- the offline outbox (`setOffline`) syncing exactly once
+- Helper Mode family switching with PINs
+- Scam Shield samples
+- the officer queue, citizen consent take-back (403), admin Digital Twin and fault toggles, auditor hash chain and the `/eval` charts
+
+Every test fails on any uncaught page error, `console.error` or unexpected API 4xx/5xx. Fixtures are regenerated with `python backend/scripts/make_e2e_fixtures.py`.
+
 **SQLite is the default** (zero setup). For PostgreSQL: `docker compose up -d db`, set `DATABASE_URL` from `.env.example`, then `alembic upgrade head` (or let the dev server create the schema). `postgres://` and `postgresql://` URLs are normalised to the psycopg 3 driver automatically. To run the whole test suite on Postgres: `TEST_DATABASE_URL=postgres://user@host:5432/lastmile_test python -m pytest` (that database is wiped). Optional tooling: `python scripts/generate_voice_assets.py --force` regenerates the Urdu/English prompt MP3s (needs internet once).
 
 ## Deployment
@@ -215,7 +227,7 @@ These numbers come from synthetic data that the same team generated. Treat them 
 * **In-memory state.** Rate limiter and fault switches are per-process (single-instance prototype); production needs Redis or similar.
 * **PostgreSQL verified locally, not in CI.** The suite (118 DB-backed tests), Alembic migrations, idempotent re-seeding across two simulated boots, the append-only trigger and the 23-step demo were run against PostgreSQL 16.13; the default CI-style run uses SQLite.
 * **Docker image not built in this environment** (no Docker available). The dependency set was resolved for Linux x86-64 on Python 3.11–3.14 (wheels only), but the first real build happens on your host/Render.
-* **Frontend flows were verified by build, lint and API e2e tests, not by automated browser tests.** Bugs found in manual browser testing (Urdu line-height, speaker taps navigating, dictation cutting off) were fixed in code; re-check them on a real phone.
+* **Browser coverage is headless Chromium on desktop/phone viewports.** Real phones (Android WebView/Safari), real microphones and Urdu speech recognition are not automated: the continuous dictation flow still needs a manual check on a device.
 
 ## API map
 

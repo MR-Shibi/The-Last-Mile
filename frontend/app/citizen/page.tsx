@@ -38,8 +38,8 @@ function CitizenHome() {
       </div>
       <div className="mt-4 grid gap-4">
         {schemes.map((s) => (
-          <div key={s.id} className="relative">
-            <button onClick={() => setActive(s)} className="flex min-h-[168px] w-full items-center gap-4 rounded-3xl border-4 border-black bg-white p-5 pe-24 text-start shadow">
+          <div key={s.id} className="relative" data-testid="scheme-card">
+            <button data-testid="scheme-open" onClick={() => setActive(s)} className="flex min-h-[168px] w-full items-center gap-4 rounded-3xl border-4 border-black bg-white p-5 pe-24 text-start shadow">
               <span className="shrink-0 text-6xl" aria-hidden>{ICONS[s.icon] || "🤲"}</span>
               <span className="flex min-w-0 flex-1 flex-col gap-3">
                 <span className="urdu-title block text-2xl font-bold">{lang === "ur" ? s.name_ur : s.name_en}</span>
