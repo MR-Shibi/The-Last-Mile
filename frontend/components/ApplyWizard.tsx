@@ -80,7 +80,10 @@ export default function ApplyWizard({ scheme, citizenUserId, onCancel }: { schem
       if (!navigator.onLine) return;
       const form = new FormData();
       form.append("file", s.file);
-      const qs = data.cnic ? `?cnic=${encodeURIComponent(String(data.cnic))}` : "";
+      const params = new URLSearchParams();
+      if (data.cnic) params.set("cnic", String(data.cnic));
+      if (isHelper) params.set("citizen_user_id", String(citizenUserId)); // whose photo it is (shared phone)
+      const qs = params.size ? `?${params.toString()}` : "";
       const v = await api<VisionResult>(`/vision/check${qs}`, { form });
       setVision(v);
       if (!v.ok_to_submit) void speak({ audioKey: "retake_photo", lang });

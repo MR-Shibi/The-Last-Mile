@@ -85,3 +85,26 @@ def test_ocr_memory_error_escalates_instead_of_crashing(client, auth, db, monkey
 def test_non_images_still_rejected(client, auth, payload):
     r = client.post("/vision/check", headers=auth("sindh.citizen"), files={"file": ("x.png", payload, "image/png")})
     assert r.status_code == 422
+
+
+def test_live_photo_check_does_not_flag_citizens_own_earlier_photo(client, auth, seeded):
+    """Regression (found on the live deployment): re-using your own CNIC photo for a second application
+    must not be called a duplicate; the same photo from a different citizen still must be."""
+    fams = {f["username"]: f for f in seeded["tenants"]["sindh-spd"]["families"]}
+    owner, stranger = fams["sindh.family04"], fams["sindh.family05"]
+    img = make_card("Own Photo", "X", "42101-1234567-1", noise_seed=8080)
+    h = auth(owner["username"])
+    sid = next(s["id"] for s in client.get("/schemes", headers=h).json() if s["code"] == "widow-relief")
+    case = client.post("/cases", headers=h, json={"scheme_id": sid, "data": {"full_name": "Own Photo"}}).json()
+    assert client.post(f"/cases/{case['id']}/documents", headers=h, files={"file": ("c.png", img, "image/png")}).status_code == 201
+
+    def check(headers, qs=""):
+        return client.post(f"/vision/check{qs}", headers=headers, files={"file": ("c.png", img, "image/png")}).json()
+
+    own = check(h)
+    assert "duplicate_document" not in own["flags"] and own["checks"]["hash_reused_by_other_claims"] == 0
+    assert "duplicate_document" in check(auth(stranger["username"]))["flags"]
+    hh = auth("sindh.helper")  # shared phone: owner is the family named in the request (must be linked)
+    assert "duplicate_document" not in check(hh, f"?citizen_user_id={owner['user_id']}")["flags"]
+    assert "duplicate_document" in check(hh, f"?citizen_user_id={stranger['user_id']}")["flags"]
+    assert "duplicate_document" in check(hh)["flags"]  # unknown owner -> conservative

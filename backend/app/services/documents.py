@@ -10,13 +10,16 @@ from app.models import Case, CaseField, ConsentScope, Document, MockRegistry
 from app.services.cnic import normalize_cnic
 
 
-def cross_check(db: Session, analysis: dict, claimed: dict, case: Case | None) -> dict:
+def cross_check(db: Session, analysis: dict, claimed: dict, case: Case | None, owner_user_id: int | None = None) -> dict:
+    """`owner_user_id` identifies whose photo this is when there is no case yet (live pre-submit check),
+    so a citizen re-using HER OWN earlier photo (e.g. for a second scheme) is not called a duplicate."""
+    owner = case.citizen_user_id if case is not None else owner_user_id
     flags = list(analysis["flags"])
     checks: dict = {}
 
     # 1) Same image reused by a different citizen's claim
     q = select(Document, Case).join(Case, Document.case_id == Case.id).where(Document.sha256 == analysis["sha256"])
-    reused = [(d, c) for d, c in db.execute(q).all() if case is None or c.citizen_user_id != case.citizen_user_id]
+    reused = [(d, c) for d, c in db.execute(q).all() if owner is None or c.citizen_user_id != owner]
     checks["hash_reused_by_other_claims"] = len(reused)
     if reused:
         flags.append("duplicate_document")

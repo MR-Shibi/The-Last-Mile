@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.api.cases import latest_decision
 from app.core.audit import write_audit
-from app.core.consent import require_case_access
+from app.core.consent import is_linked_helper, require_case_access
 from app.core.database import get_db
 from app.core.deps import bearer, get_current_user, require_api_key, require_roles
 from app.core.ratelimit import limiter
@@ -67,15 +67,21 @@ async def upload_document(case_id: int, file: UploadFile = File(...),
 
 
 @router.post("/vision/check")
-async def vision_check(file: UploadFile = File(...), cnic: str | None = None,
+async def vision_check(file: UploadFile = File(...), cnic: str | None = None, citizen_user_id: int | None = None,
                        user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
-    """Live pre-submit check so the citizen gets an instant retake prompt. Nothing is stored."""
+    """Live pre-submit check so the citizen gets an instant retake prompt. Nothing is stored.
+    The photo's owner is the logged-in citizen, or (for a helper) a linked family passed as citizen_user_id."""
     data = await _read_upload(file)
     try:
         analysis = analyze_document(data)
     except ValueError as e:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(e)) from e
-    xc = cross_check(db, analysis, {"cnic": cnic}, None)
+    owner = None
+    if user.role == Role.CITIZEN:
+        owner = user.id
+    elif user.role == Role.HELPER and citizen_user_id is not None and is_linked_helper(db, user.id, citizen_user_id):
+        owner = citizen_user_id
+    xc = cross_check(db, analysis, {"cnic": cnic}, None, owner_user_id=owner)
     preview = engine_route(0.99, True, xc["flags"])
     return {"flags": xc["flags"], "checks": xc["checks"], "quality": analysis["quality"],
             "retake_tips": analysis["retake_tips"], "ocr": {k: v for k, v in analysis["ocr"].items() if k != "raw_lines"},
