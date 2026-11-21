@@ -29,6 +29,8 @@ SCAM_RU = [
     "Ehsaas lucky draw mein {name} ka naam aya hai. {fee} fee jama karwa kar {amt} hasil karein.",
     "Aap ki imdad {amt} rok di gayi hai. Fori {link} par click kar ke verify karein.",
     "Mubarak! Hukumat ki taraf se {amt} manzoor. Registration ke liye {fee} bhejna lazmi hai {num}.",
+    "Aap ko {amt} rupay mile hain, in mein se {fee} rupay humein bhej dein taake hum aap ko raqam bhej sakein {num}",
+    "Kafalat bonus {amt} aap ke naam. Advance tax {fee} rupay Easypaisa {num} par jama karwayein",
 ]
 SCAM_UR = [
     "مبارک ہو! آپ کو {amt} روپے امداد ملی ہے۔ وصولی کے لیے {fee} روپے فیس {num} پر بھیجیں۔",
@@ -37,6 +39,10 @@ SCAM_UR = [
     "انعامی قرعہ اندازی میں آپ کا نام نکلا ہے۔ {fee} روپے رجسٹریشن فیس جمع کروائیں {num}۔",
     "حکومت کی طرف سے {amt} روپے منظور۔ ایزی پیسہ {num} پر {fee} روپے سیکیورٹی بھیجیں۔",
     "آپ کا او ٹی پی کوڈ ہمارے نمائندے کو {num} پر بتائیں ورنہ امداد منسوخ ہو جائے گی۔",
+    "آپ کو {amt} روپے ملے ہیں۔ ان میں سے {fee} روپے ہمیں بھیج دیں تاکہ ہم آپ کو یہ رقم بھیج سکیں {num}",
+    "مبارک ہو آپ کا بونس {amt} روپے منظور ہو گیا ہے۔ ایڈوانس ٹیکس {fee} روپے جمع کرائیں {num}",
+    "آپ کا انعام {amt} روپے تیار ہے۔ اپنا اکاؤنٹ نمبر اور پن کوڈ اس نمبر پر بھیجیں {num}",
+    "وظیفہ {amt} روپے آپ کے نام نکلا ہے۔ چارجز {fee} روپے جاز کیش کر دیں {num}",
 ]
 
 LEGIT_EN = [
@@ -63,6 +69,7 @@ LEGIT_UR = [
     "8171: آپ کی درخواست زیر غور ہے۔ کسی کو رقم دینے کی ضرورت نہیں۔ ہیلپ لائن 0800-26477۔",
     "8171: ادائیگی صرف مجاز کیمپ سائٹ اور بینک پر ہوتی ہے۔ دھوکہ دہی کی اطلاع 0800-26477 پر دیں۔",
     "سندھ سوشل پروٹیکشن: آپ کا کیس نمبر {ref} موصول ہو گیا ہے۔ افسر آپ سے رابطہ کرے گا۔ کوئی فیس نہیں۔",
+    "8171 بے نظیر انکم سپورٹ: آپ کی {amt} روپے کی قسط کیمپ سائٹ پر دستیاب ہے۔ کسی کو رقم دینے کی ضرورت نہیں۔",
 ]
 
 

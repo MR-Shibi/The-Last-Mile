@@ -229,8 +229,15 @@ def f07() -> list[dict]:
                         ref=f"LM-{r.randint(10000, 99999)}")
         out.append({"id": f"07_scam_messages-{i:03d}", "family": "07_scam_messages", "kind": "scam", "text": text,
                     "truth": {"scam": scam},
-                    "expect": {"verdicts": ["SCAM", "UNCERTAIN_HUMAN_REVIEW"] if scam else ["LIKELY_SAFE", "UNCERTAIN_HUMAN_REVIEW"]},
+                    "expect": {"verdicts": ["SCAM", "UNCERTAIN_HUMAN_REVIEW"] if scam else ["OFFICIAL_STYLE_NOTICE", "NOT_A_GOV_MESSAGE", "UNCERTAIN_HUMAN_REVIEW"]},
                     "note": "held-out phrasing (not in training templates)"})
+    # Regression cases from live user testing: strict expectations (no "not sure", never "government")
+    out.append({"id": f"07_scam_messages-{PER_FAMILY:03d}", "family": "07_scam_messages", "kind": "scam",
+                "text": "آپ کو 10 ہزار روپے ملے ہیں آپ ان 10 ہزار روپے میں سے ہمیں 200 روپے بھیج دیں تاکہ ہم آپ کو یہ 10 ہزار بھیج سکیں", "truth": {"scam": True}, "expect": {"verdicts": ["SCAM"]},
+                "note": "Urdu-script advance-fee lure (live regression): must be SCAM, never UNCERTAIN"})
+    out.append({"id": f"07_scam_messages-{PER_FAMILY + 1:03d}", "family": "07_scam_messages", "kind": "scam",
+                "text": "بھائی کل دکان پر آ جانا", "truth": {"scam": False}, "expect": {"verdicts": ["NOT_A_GOV_MESSAGE"]},
+                "note": "casual non-government text (live regression): never labelled a government message"})
     return out
 
 

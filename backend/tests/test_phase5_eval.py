@@ -71,7 +71,7 @@ def test_scam_and_forensics_metrics_reported_honestly(eval_results):
     sm, fm = eval_results["scam_metrics"], eval_results["forensics_metrics"]
     for k in ("precision", "recall_flagged_as_scam", "false_alarm_rate", "missed_scam_rate", "legit_sent_to_review_rate"):
         assert 0.0 <= sm[k] <= 1.0
-    assert sm["n"] == 42 and sm["missed_scam_rate"] <= 0.1 and sm["false_alarm_rate"] <= 0.1
+    assert sm["n"] == 44 and sm["missed_scam_rate"] <= 0.1 and sm["false_alarm_rate"] <= 0.1
     assert fm["recall"] >= 0.9 and fm["false_alarm_rate"] <= 0.1 and fm["true_negative"] >= 10
 
 

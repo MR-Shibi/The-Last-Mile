@@ -235,18 +235,20 @@ def test_injection_patterns_cannot_lower_risk(text):
 def test_official_notice_is_safe_and_urdu_scam_detected():
     safe = check_sms("8171: Your BISP payment of Rs 25000 is ready. Collect it at your designated campsite with "
                      "your original CNIC. No fee is charged.")
-    assert safe["verdict"] == "LIKELY_SAFE" and safe["color"] == "green"
+    assert safe["verdict"] == "OFFICIAL_STYLE_NOTICE" and safe["color"] == "green"
+    assert "8171" in safe["headline_ur"] and "100%" not in safe["headline_en"]
     assert check_sms("مبارک ہو! آپ کو 25000 روپے ملے ہیں۔ 500 روپے فیس بھیجیں۔")["verdict"] == "SCAM"
-    assert check_sms("Assalam o alaikum, kal shaam ghar aa jana")["verdict"] == "LIKELY_SAFE"
+    assert check_sms("Assalam o alaikum, kal shaam ghar aa jana")["verdict"] == "NOT_A_GOV_MESSAGE"
 
 
 def test_borderline_probability_routes_to_human_review():
-    assert verdict_from_probability(0.39) == "LIKELY_SAFE"
-    assert verdict_from_probability(0.40) == "UNCERTAIN_HUMAN_REVIEW"
-    assert verdict_from_probability(0.79) == "UNCERTAIN_HUMAN_REVIEW"
-    assert verdict_from_probability(0.80) == "SCAM"
+    assert verdict_from_probability(0.34) == "NOT_A_GOV_MESSAGE"
+    assert verdict_from_probability(0.34, official_style=True) == "OFFICIAL_STYLE_NOTICE"
+    assert verdict_from_probability(0.35) == "UNCERTAIN_HUMAN_REVIEW"
+    assert verdict_from_probability(0.69) == "UNCERTAIN_HUMAN_REVIEW"
+    assert verdict_from_probability(0.70) == "SCAM"
     r = check_sms("BISP payment update. Call 0300-5551234 for details.")
-    assert 0.40 <= r["probability"] < 0.80 and r["verdict"] == "UNCERTAIN_HUMAN_REVIEW"
+    assert 0.35 <= r["probability"] < 0.70 and r["verdict"] == "UNCERTAIN_HUMAN_REVIEW"
 
 
 def test_policy_rag_returns_grounded_citations(client):

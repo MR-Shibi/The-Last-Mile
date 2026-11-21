@@ -301,11 +301,25 @@ test("6 — Scam Shield flags the sample scam SMS with a policy citation", async
   await page.getByRole("button", { name: /Sample Scam SMS/ }).click();
   const verdict = page.getByTestId("scam-verdict");
   await expect(verdict).toHaveAttribute("data-verdict", "SCAM");
-  await expect(verdict).toContainText("SCAM — do not pay");
+  await expect(verdict).toContainText("do not send any fee or money");
+  await expect(verdict).toHaveAttribute("data-color", "red");
   await expect(page.getByText("No Fee Is Ever Charged").first()).toBeVisible();
 
   await page.getByRole("button", { name: /Sample Official SMS/ }).click();
-  await expect(verdict).toHaveAttribute("data-verdict", "LIKELY_SAFE");
+  await expect(verdict).toHaveAttribute("data-verdict", "OFFICIAL_STYLE_NOTICE");
+  await expect(verdict).toContainText("8171");
+
+  // Casual text is never presented as a government message
+  await page.locator("textarea").fill("بھائی کل دکان پر آ جانا");
+  await page.getByRole("button", { name: "Check", exact: true }).click();
+  await expect(verdict).toHaveAttribute("data-verdict", "NOT_A_GOV_MESSAGE");
+  await expect(page.getByText(/100%/)).toHaveCount(0);
+
+  // Urdu-script advance-fee lure is a SCAM, not "not sure"
+  await page.locator("textarea").fill("آپ کو 10 ہزار روپے ملے ہیں آپ ان 10 ہزار روپے میں سے ہمیں 200 روپے بھیج دیں تاکہ ہم آپ کو یہ 10 ہزار بھیج سکیں");
+  await page.getByRole("button", { name: "Check", exact: true }).click();
+  await expect(verdict).toHaveAttribute("data-verdict", "SCAM");
+  await expect(page.getByText("No Fee Is Ever Charged").first()).toBeVisible();
 
   await page.locator("textarea").fill("Mubarak ho! 25000 BISP relief ke liye abhi 500 fee bhejen");
   await page.getByRole("button", { name: "Check", exact: true }).click();

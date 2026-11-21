@@ -1,6 +1,6 @@
 {
  "version": 1,
- "count": 546,
+ "count": 548,
  "cases": [
   {
    "id": "01_name_variants-000",
@@ -8915,7 +8915,8 @@
    },
    "expect": {
     "verdicts": [
-     "LIKELY_SAFE",
+     "OFFICIAL_STYLE_NOTICE",
+     "NOT_A_GOV_MESSAGE",
      "UNCERTAIN_HUMAN_REVIEW"
     ]
    },
@@ -8931,7 +8932,8 @@
    },
    "expect": {
     "verdicts": [
-     "LIKELY_SAFE",
+     "OFFICIAL_STYLE_NOTICE",
+     "NOT_A_GOV_MESSAGE",
      "UNCERTAIN_HUMAN_REVIEW"
     ]
    },
@@ -8947,7 +8949,8 @@
    },
    "expect": {
     "verdicts": [
-     "LIKELY_SAFE",
+     "OFFICIAL_STYLE_NOTICE",
+     "NOT_A_GOV_MESSAGE",
      "UNCERTAIN_HUMAN_REVIEW"
     ]
    },
@@ -8963,7 +8966,8 @@
    },
    "expect": {
     "verdicts": [
-     "LIKELY_SAFE",
+     "OFFICIAL_STYLE_NOTICE",
+     "NOT_A_GOV_MESSAGE",
      "UNCERTAIN_HUMAN_REVIEW"
     ]
    },
@@ -8979,7 +8983,8 @@
    },
    "expect": {
     "verdicts": [
-     "LIKELY_SAFE",
+     "OFFICIAL_STYLE_NOTICE",
+     "NOT_A_GOV_MESSAGE",
      "UNCERTAIN_HUMAN_REVIEW"
     ]
    },
@@ -8995,7 +9000,8 @@
    },
    "expect": {
     "verdicts": [
-     "LIKELY_SAFE",
+     "OFFICIAL_STYLE_NOTICE",
+     "NOT_A_GOV_MESSAGE",
      "UNCERTAIN_HUMAN_REVIEW"
     ]
    },
@@ -9011,7 +9017,8 @@
    },
    "expect": {
     "verdicts": [
-     "LIKELY_SAFE",
+     "OFFICIAL_STYLE_NOTICE",
+     "NOT_A_GOV_MESSAGE",
      "UNCERTAIN_HUMAN_REVIEW"
     ]
    },
@@ -9027,7 +9034,8 @@
    },
    "expect": {
     "verdicts": [
-     "LIKELY_SAFE",
+     "OFFICIAL_STYLE_NOTICE",
+     "NOT_A_GOV_MESSAGE",
      "UNCERTAIN_HUMAN_REVIEW"
     ]
    },
@@ -9043,7 +9051,8 @@
    },
    "expect": {
     "verdicts": [
-     "LIKELY_SAFE",
+     "OFFICIAL_STYLE_NOTICE",
+     "NOT_A_GOV_MESSAGE",
      "UNCERTAIN_HUMAN_REVIEW"
     ]
    },
@@ -9059,7 +9068,8 @@
    },
    "expect": {
     "verdicts": [
-     "LIKELY_SAFE",
+     "OFFICIAL_STYLE_NOTICE",
+     "NOT_A_GOV_MESSAGE",
      "UNCERTAIN_HUMAN_REVIEW"
     ]
    },
@@ -9075,7 +9085,8 @@
    },
    "expect": {
     "verdicts": [
-     "LIKELY_SAFE",
+     "OFFICIAL_STYLE_NOTICE",
+     "NOT_A_GOV_MESSAGE",
      "UNCERTAIN_HUMAN_REVIEW"
     ]
    },
@@ -9091,7 +9102,8 @@
    },
    "expect": {
     "verdicts": [
-     "LIKELY_SAFE",
+     "OFFICIAL_STYLE_NOTICE",
+     "NOT_A_GOV_MESSAGE",
      "UNCERTAIN_HUMAN_REVIEW"
     ]
    },
@@ -9107,7 +9119,8 @@
    },
    "expect": {
     "verdicts": [
-     "LIKELY_SAFE",
+     "OFFICIAL_STYLE_NOTICE",
+     "NOT_A_GOV_MESSAGE",
      "UNCERTAIN_HUMAN_REVIEW"
     ]
    },
@@ -9123,7 +9136,8 @@
    },
    "expect": {
     "verdicts": [
-     "LIKELY_SAFE",
+     "OFFICIAL_STYLE_NOTICE",
+     "NOT_A_GOV_MESSAGE",
      "UNCERTAIN_HUMAN_REVIEW"
     ]
    },
@@ -9139,7 +9153,8 @@
    },
    "expect": {
     "verdicts": [
-     "LIKELY_SAFE",
+     "OFFICIAL_STYLE_NOTICE",
+     "NOT_A_GOV_MESSAGE",
      "UNCERTAIN_HUMAN_REVIEW"
     ]
    },
@@ -9155,11 +9170,42 @@
    },
    "expect": {
     "verdicts": [
-     "LIKELY_SAFE",
+     "OFFICIAL_STYLE_NOTICE",
+     "NOT_A_GOV_MESSAGE",
      "UNCERTAIN_HUMAN_REVIEW"
     ]
    },
    "note": "held-out phrasing (not in training templates)"
+  },
+  {
+   "id": "07_scam_messages-042",
+   "family": "07_scam_messages",
+   "kind": "scam",
+   "text": "آپ کو 10 ہزار روپے ملے ہیں آپ ان 10 ہزار روپے میں سے ہمیں 200 روپے بھیج دیں تاکہ ہم آپ کو یہ 10 ہزار بھیج سکیں",
+   "truth": {
+    "scam": true
+   },
+   "expect": {
+    "verdicts": [
+     "SCAM"
+    ]
+   },
+   "note": "Urdu-script advance-fee lure (live regression): must be SCAM, never UNCERTAIN"
+  },
+  {
+   "id": "07_scam_messages-043",
+   "family": "07_scam_messages",
+   "kind": "scam",
+   "text": "بھائی کل دکان پر آ جانا",
+   "truth": {
+    "scam": false
+   },
+   "expect": {
+    "verdicts": [
+     "NOT_A_GOV_MESSAGE"
+    ]
+   },
+   "note": "casual non-government text (live regression): never labelled a government message"
   },
   {
    "id": "08_weak_network-000",

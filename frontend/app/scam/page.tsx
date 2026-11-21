@@ -11,13 +11,21 @@ const SAMPLE_SCAM = "Mubarak ho! Aap ka 25000 rupay ka BISP inaam nikla hai. For
 const SAMPLE_OFFICIAL = "8171: Aap ki BISP qist Rs 25000 tayyar hai. Asal CNIC ke sath qareebi campsite se wasool karein. Koi fee nahi. Apna PIN kisi ko na batayen.";
 
 interface Citation { source: string; document: string; section: string; snippet: string }
-interface ScamResult { verdict: string; color: "red" | "yellow" | "green"; probability: number; reasons_en: string[]; reasons_ur: string[]; citations: Citation[]; injection_detected: boolean }
+type Verdict = "SCAM" | "UNCERTAIN_HUMAN_REVIEW" | "NOT_A_GOV_MESSAGE" | "OFFICIAL_STYLE_NOTICE" | "BLOCKED_PROMPT_INJECTION";
+interface ScamResult {
+  verdict: Verdict; color: "red" | "amber" | "neutral" | "green"; headline_en: string; headline_ur: string; probability: number;
+  reasons_en: string[]; reasons_ur: string[]; citations: Citation[]; injection_detected: boolean;
+}
 
-const STYLE = {
-  red: { bg: "bg-danger", icon: "⛔", en: "SCAM — do not pay", ur: "دھوکہ — رقم نہ بھیجیں", audio: "scam_warning" },
-  yellow: { bg: "bg-warn", icon: "⚠️", en: "NOT SURE — call the helpline first", ur: "یقین نہیں — پہلے ہیلپ لائن پر فون کریں", audio: null },
-  green: { bg: "bg-ok", icon: "✅", en: "Looks official", ur: "سرکاری لگتا ہے", audio: "safe_message" },
-} as const;
+/** Visual style per verdict. The headline text always comes from the server, which never claims a message is
+ * "100% government": low risk alone only means "not a government relief message" unless official markers match. */
+const STYLE: Record<Verdict, { bg: string; icon: string; label_en: string; label_ur: string; audio: string | null }> = {
+  SCAM: { bg: "bg-danger text-white", icon: "⛔", label_en: "SCAM", label_ur: "دھوکہ دہی", audio: "scam_warning" },
+  BLOCKED_PROMPT_INJECTION: { bg: "bg-danger text-white", icon: "🛑", label_en: "BLOCKED", label_ur: "روک دیا گیا", audio: "scam_warning" },
+  UNCERTAIN_HUMAN_REVIEW: { bg: "bg-amber-400 text-black", icon: "⚠️", label_en: "NOT SURE", label_ur: "مشکوک", audio: null },
+  NOT_A_GOV_MESSAGE: { bg: "bg-slate-600 text-white", icon: "💬", label_en: "NOT A GOVERNMENT MESSAGE", label_ur: "غیر سرکاری یا عام پیغام", audio: null },
+  OFFICIAL_STYLE_NOTICE: { bg: "bg-ok text-white", icon: "ℹ️", label_en: "OFFICIAL-STYLE NOTICE", label_ur: "سرکاری طرز کا پیغام", audio: "safe_message" },
+};
 
 /** Shopkeeper Scam Shield: paste or speak an SMS -> big verdict card + Urdu reasons + official source. */
 export default function ScamShield() {
@@ -39,7 +47,7 @@ export default function ScamShield() {
     try {
       const r = await api<ScamResult>("/scam/check", { body: { text: msg } });
       setRes(r);
-      const audio = STYLE[r.color].audio;
+      const audio = STYLE[r.verdict]?.audio ?? null;
       void speak({ audioKey: audio, text: r.reasons_ur.join(" "), textEn: r.reasons_en.join(" "), lang });
     } finally {
       setBusy(false);
@@ -52,7 +60,7 @@ export default function ScamShield() {
     void check(msg);
   }
 
-  const s = res ? STYLE[res.color] : null;
+  const s = res ? STYLE[res.verdict] ?? STYLE.UNCERTAIN_HUMAN_REVIEW : null;
   return (
     <>
       <AppHeader title={L("Scam Shield", "دھوکہ ڈھال")} />
@@ -78,11 +86,12 @@ export default function ScamShield() {
         {dict.error && <p className="mt-2 font-bold text-danger">{dict.error === "unsupported" ? L("Voice input is not supported in this browser — paste or use a sample.", "اس براؤزر میں آواز ممکن نہیں — پیغام چسپاں کریں یا نمونہ استعمال کریں۔") : L("Could not hear you. Try again.", "آواز سنائی نہیں دی۔ دوبارہ کوشش کریں۔")}</p>}
         {res && s && (
           <div className="mt-6" role="status" aria-live="polite">
-            <div data-testid="scam-verdict" data-verdict={res.verdict} className={`${s.bg} flex items-center gap-4 rounded-3xl p-6 text-white`}>
+            <div data-testid="scam-verdict" data-verdict={res.verdict} data-color={res.color} className={`${s.bg} flex items-center gap-4 rounded-3xl p-6`}>
               <span className="text-6xl" aria-hidden>{s.icon}</span>
               <div className="flex-1">
-                <div className="text-3xl font-bold">{lang === "ur" ? s.ur : s.en}</div>
-                <div className="text-sm opacity-90" dir="ltr">{res.verdict} · risk {(res.probability * 100).toFixed(0)}%</div>
+                <div className="text-sm font-bold opacity-90">{lang === "ur" ? s.label_ur : s.label_en}</div>
+                <div className="text-2xl font-bold">{lang === "ur" ? res.headline_ur : res.headline_en}</div>
+                <div className="text-sm opacity-90" dir="ltr">scam risk score {(res.probability * 100).toFixed(0)} / 100</div>
               </div>
               <SpeakButton audioKey={s.audio} text={res.reasons_ur.join(" ")} textEn={res.reasons_en.join(" ")} size="lg" />
             </div>

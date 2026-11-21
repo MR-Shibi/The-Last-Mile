@@ -18,9 +18,26 @@ from sklearn.pipeline import FeatureUnion, Pipeline
 
 from app.ml.scam_data import build_corpus
 
-MODEL_VERSION = "scamshield-tfidf-lr-v1"
-SCAM_THRESHOLD = 0.80
-UNCERTAIN_LOW = 0.40
+MODEL_VERSION = "scamshield-tfidf-lr-v2 (advance-fee rule)"
+SCAM_THRESHOLD = 0.70
+UNCERTAIN_LOW = 0.35
+ADVANCE_FEE_FLOOR = 0.94
+SCAM, UNCERTAIN = "SCAM", "UNCERTAIN_HUMAN_REVIEW"
+NOT_GOV, OFFICIAL_STYLE = "NOT_A_GOV_MESSAGE", "OFFICIAL_STYLE_NOTICE"
+# Low risk is NOT proof of authenticity: a low-risk message is only "official-style" when it also carries
+# the verified relief markers below; anything else is simply "not a government relief message".
+VERDICT_UI = {
+    SCAM: ("red", "Danger: this is a scam/spam message — do not send any fee or money.",
+           "خطرہ: یہ دھوکہ دہی (Scam/Spam) کا پیغام ہے — کوئی فیس یا رقم نہ بھیجیں"),
+    UNCERTAIN: ("amber", "Not sure — verify with the government office or 8171 before acting.",
+                "تصدیق نہیں ہو سکی (Not Sure) — سرکاری دفتر یا 8171 سے تصدیق کریں"),
+    NOT_GOV: ("neutral", "This is not a government relief message.",
+              "یہ سرکاری امدادی پیغام نہیں ہے (Not a Government Relief Message)"),
+    OFFICIAL_STYLE: ("green", "Official-style information message (please verify only via 8171). Not a guarantee.",
+                     "سرکاری طرز کا معلوماتی پیغام (براہِ کرم صرف 8171 سے تصدیق کریں)"),
+    "BLOCKED_PROMPT_INJECTION": ("red", "Blocked: this message tries to manipulate the checker.",
+                                 "روک دیا گیا: یہ پیغام جانچنے والے نظام کو دھوکہ دینے کی کوشش کرتا ہے"),
+}
 POLICY_DIR = Path(__file__).parent / "policies"
 
 # ----------------------------------------------------------------- injection guardrail
@@ -57,17 +74,19 @@ def detect_injection(text: str | None) -> dict:
 
 # ----------------------------------------------------------------- explainable risk signals
 SIGNALS = {
-    "fee_request": (r"\bfee\b|charges?|deposit|\btax\b|bhej(en|na|o|ein)|jama\s*kar|processing|registration\s+charge"
-                    r"|فیس|بھیجیں|جمع\s*کروائیں|سیکیورٹی|easypaisa|jazzcash|ایزی\s*پیسہ",
+    "fee_request": (r"\bfee\b|charges?|deposit|\btax\b|advance|bhej(en|na|o|ein|\s*d(ein|o|e))|jama\s*kar|processing|registration\s+charge"
+                    r"|فیس|بھیجیں|بھیج\s*د(یں|و|ے)|بھجوا|جمع\s*(کروائیں|کرائیں|کرا\s*دیں)|ٹیکس|ایڈوانس|چارجز|سیکیورٹی"
+                    r"|easypaisa|jazzcash|ایزی\s*پیسہ|جاز\s*کیش",
                     0.6, ("Asks you to pay a fee or send money first.", "پہلے فیس یا رقم بھیجنے کو کہتا ہے۔")),
-    "pin_otp_request": (r"\bpin\b|\botp\b|verification\s+code|4\s*digit\s+code|password|پن|او\s*ٹی\s*پی",
+    "pin_otp_request": (r"\bpin\b|\botp\b|verification\s+code|4\s*digit\s+code|password|account\s+number"
+                        r"|پن|پن\s*کوڈ|او\s*ٹی\s*پی|اکاؤنٹ\s*نمبر|اکاونٹ\s*نمبر",
                         0.5, ("Asks for your PIN or OTP code.", "آپ کا پن یا او ٹی پی کوڈ مانگتا ہے۔")),
     "suspicious_link": (r"https?://|www\.|bit\.ly|tinyurl|\b[\w-]+\.(com|net|org|site|xyz|top|click|info|online|live|link|pk|me)\b"
                         r"|/claim|/apply",
                         0.4, ("Contains a link that is not official.", "اس میں غیر سرکاری لنک ہے۔")),
     "urgency": (r"urgent|immediately|final\s+notice|expire|within\s+\d+\s+hours|foran|jaldi|fori|warna|فوری|ختم\s+ہو\s+جائے",
                 0.2, ("Creates panic or a deadline.", "جلدی یا ڈر پیدا کرتا ہے۔")),
-    "prize_lure": (r"\bwon\b|winner|lucky\s+draw|inaam|congratulations|mubarak|انعام|قرعہ|مبارک",
+    "prize_lure": (r"\bwon\b|winner|lucky\s+draw|inaam|bonus|congratulations|mubarak|انعام|بونس|قرعہ|مبارک",
                    0.2, ("Promises a prize or lucky draw.", "انعام یا قرعہ اندازی کا وعدہ کرتا ہے۔")),
     "personal_number": (r"\b03\d{2}[-\s]?\d{7}\b", 0.25, ("Sent from or asks you to call a personal mobile number.",
                                                          "ذاتی موبائل نمبر سے آیا ہے یا اس پر رابطے کو کہتا ہے۔")),
@@ -75,6 +94,36 @@ SIGNALS = {
 OFFICIAL_MARKERS = r"^\s*8171\b|no\s+fee|koi\s+fee\s+nahi|کوئی\s+فیس\s+نہیں|0800-26477|never\s+share|kisi\s+ko\s+na\s+batayen"
 _SIG = {k: (re.compile(p, re.I), w, txt) for k, (p, w, txt) in SIGNALS.items()}
 _OFFICIAL = re.compile(OFFICIAL_MARKERS, re.I)
+# Verified relief markers required before a low-risk message may be called "official-style".
+_OFFICIAL_RELIEF = re.compile(
+    r"\b8171\b|\bBISP\b|benazir\s+income\s+support|بے\s*نظیر\s*انکم\s*سپورٹ|بینظیر\s*انکم\s*سپورٹ"
+    r"|کوئی\s+فیس\s+نہیں|koi\s+fee\s+nahi|no\s+fee|sindh\s+social\s+protection|punjab\s+relief\s+dept|سندھ\s+سوشل\s+پروٹیکشن", re.I)
+
+# Advance-fee fraud = a promise of money/prize/relief + a request to send/pay money back first.
+_PROMISE = re.compile(
+    r"ملے\s*ہیں|ملے\s*ہے|ملیں\s*گے|روپے\s*ملے|مبارک|بونس|انعام|امداد|وظیفہ|قرعہ|\d[\d,]*\s*ہزار|\d[\d,]*\s*روپے"
+    r"|mubarak|bonus|inaam|relief|kafalat|prize|\bwon\b|winner|lucky\s+draw|grant|\bmil(e|ay|a)\s+(hain|hai|gaye)"
+    r"|\d[\d,]*\s*hazar|\brs\.?\s*\d|\d[\d,]*\s*rupay", re.I)
+_SEND_BACK = re.compile(
+    r"بھیج\s*د(یں|و|ے)|بھیجیں|بھجوا|جمع\s*(کرائیں|کروائیں|کرا\s*دیں)|ادائیگی\s*(کریں|کرائیں|کر\s*دیں)|فیس|ٹیکس|ایڈوانس|چارجز"
+    r"|ایزی\s*پیسہ|جاز\s*کیش|bhej(en|ein|o|na|\s*d(ein|o|e))|\bsend\b|transfer|\bpay\b|\bfee\b|\btax\b|advance|charges"
+    r"|easypaisa|jazzcash|jama\s*kar", re.I)
+# Protective phrasing used by genuine notices ("no fee", "you do not need to pay anyone")...
+_PROTECTIVE = re.compile(
+    r"کوئی\s+فیس\s+نہیں|رقم\s+دینے\s+کی\s+ضرورت\s+نہیں|koi\s+(fee|charges)\s+nahi|no\s+(fee|charges)"
+    r"|(do\s+not|don't|never|no\s+need\s+to)\s+(need\s+to\s+)?pay|paisay\s+na\s+dein|muft|free\s+of\s+charge|is\s+free", re.I)
+# ...unless the message ALSO tells you where to send money.
+_EXPLICIT_SEND = re.compile(r"بھیج|bhej|\bsend\b|transfer|easypaisa|jazzcash|ایزی\s*پیسہ|جاز\s*کیش|\b03\d{2}[-\s]?\d{7}\b", re.I)
+
+
+def advance_fee(text: str) -> bool:
+    if not (_PROMISE.search(text) and _SEND_BACK.search(text)):
+        return False
+    return not _PROTECTIVE.search(text) or bool(_EXPLICIT_SEND.search(text))
+
+
+def is_official_style(text: str) -> bool:
+    return bool(_OFFICIAL_RELIEF.search(text))
 _NO_FEE = re.compile(r"no\s+fee|koi\s+fee\s+nahi|کوئی\s+فیس\s+نہیں|free\s+of\s+charge|is\s+free", re.I)
 _SEND_MONEY = re.compile(r"bhej|send|transfer|pay\s|بھیجیں|easypaisa|jazzcash|deposit", re.I)
 # Messages with no money / relief vocabulary at all are out of scope (e.g. family chat).
@@ -130,12 +179,19 @@ def holdout_metrics(seed: int = 7) -> dict:
     return {"n_train": len(Xtr), "n_test": len(Xte), "accuracy": round(acc, 4), "corpus_size": len(corpus)}
 
 
-def verdict_from_probability(p: float) -> str:
+def verdict_from_probability(p: float, official_style: bool = False) -> str:
+    """>=0.70 SCAM, 0.35-0.69 UNCERTAIN, <0.35 OFFICIAL_STYLE_NOTICE only with verified relief markers,
+    otherwise NOT_A_GOV_MESSAGE. A low score is never presented as proof that a message is genuine."""
     if p >= SCAM_THRESHOLD:
-        return "SCAM"
+        return SCAM
     if p >= UNCERTAIN_LOW:
-        return "UNCERTAIN_HUMAN_REVIEW"
-    return "LIKELY_SAFE"
+        return UNCERTAIN
+    return OFFICIAL_STYLE if official_style else NOT_GOV
+
+
+def _ui(verdict: str) -> dict:
+    color, en, ur = VERDICT_UI[verdict]
+    return {"color": color, "headline_en": en, "headline_ur": ur}
 
 
 # ----------------------------------------------------------------- RAG over policy markdown
@@ -186,6 +242,7 @@ SIGNAL_QUERIES = {
     "urgency": "urgency lucky draw lures final notice pressure",
     "prize_lure": "lucky draw won prize lures",
     "personal_number": "official sender short code ordinary mobile numbers",
+    "advance_fee": "no fee is ever charged fee tax registration processing deposit send money",
 }
 
 
@@ -200,42 +257,58 @@ def answer_policy(question: str) -> dict:
 # ----------------------------------------------------------------- public entrypoint
 def check_sms(text: str) -> dict:
     inj = detect_injection(text)
-    sig = risk_signals(inj["sanitized_text"])
+    clean = inj["sanitized_text"]
+    sig = risk_signals(clean)
     if inj["injection"]:
         cites = retrieve("system override instructions official sender links", k=1) or retrieve("report fraud", k=1)
         return {
-            "verdict": "BLOCKED_PROMPT_INJECTION", "color": "red", "probability": 1.0, "model_probability": None,
-            "injection_detected": True, "injection_matches": inj["matches"], "sanitized_text": inj["sanitized_text"],
+            "verdict": "BLOCKED_PROMPT_INJECTION", **_ui("BLOCKED_PROMPT_INJECTION"), "probability": 1.0, "model_probability": None,
+            "injection_detected": True, "injection_matches": inj["matches"], "sanitized_text": clean,
             "signals": sig["signals"] + ["prompt_injection"],
             "reasons_en": ["This message tries to give orders to the system. It was blocked and reported."],
             "reasons_ur": ["یہ پیغام نظام کو حکم دینے کی کوشش کرتا ہے۔ اسے روک کر رپورٹ کر دیا گیا۔"],
             "citations": cites, "model_version": MODEL_VERSION,
         }
-    if not sig["signals"] and not _RELIEF_CONTEXT.search(inj["sanitized_text"]):
-        return {"verdict": "LIKELY_SAFE", "color": "green", "probability": 0.05, "model_probability": None,
-                "rule_score": 0.0, "injection_detected": False, "signals": [], "official_markers": False,
-                "reasons_en": ["This message is not about money or relief payments."],
-                "reasons_ur": ["یہ پیغام رقم یا امدادی ادائیگی کے بارے میں نہیں ہے۔"],
-                "citations": [], "model_version": MODEL_VERSION, "out_of_scope": True}
-    model_p = float(get_model().predict_proba([inj["sanitized_text"]])[0][1])
+    official_style = is_official_style(clean)
+    fee_scam = advance_fee(clean)
+    signals = (["advance_fee"] if fee_scam else []) + sig["signals"]
+    if not signals and not official_style and not _RELIEF_CONTEXT.search(clean):
+        return {"verdict": NOT_GOV, **_ui(NOT_GOV), "probability": 0.05, "model_probability": None, "rule_score": 0.0,
+                "injection_detected": False, "signals": [], "official_markers": False, "out_of_scope": True,
+                "reasons_en": ["This message is not about money or relief payments, so it is not a government relief message."],
+                "reasons_ur": ["یہ پیغام رقم یا امدادی ادائیگی کے بارے میں نہیں، اس لیے یہ سرکاری امدادی پیغام نہیں ہے۔"],
+                "citations": [], "model_version": MODEL_VERSION}
+    model_p = float(get_model().predict_proba([clean])[0][1])
     p = float(np.clip(0.65 * model_p + 0.35 * sig["rule_score"], 0, 1))
-    verdict = verdict_from_probability(p)
-    reasons_en = [_SIG[s][2][0] for s in sig["signals"]]
-    reasons_ur = [_SIG[s][2][1] for s in sig["signals"]]
-    if verdict == "LIKELY_SAFE":
-        reasons_en.insert(0, "This looks like an official notice: it asks for no money and no codes.")
-        reasons_ur.insert(0, "یہ سرکاری پیغام لگتا ہے: اس میں نہ رقم مانگی گئی ہے نہ کوڈ۔")
+    if fee_scam:
+        p = max(p, ADVANCE_FEE_FLOOR)  # hard rule: promising money but asking for money first is always a scam
+    verdict = verdict_from_probability(p, official_style)
+    reasons_en = [_SIG[x][2][0] for x in sig["signals"]]
+    reasons_ur = [_SIG[x][2][1] for x in sig["signals"]]
+    if fee_scam:
+        reasons_en.insert(0, "It promises you money but asks you to send money first. Real relief never charges a fee.")
+        reasons_ur.insert(0, "یہ آپ کو رقم دینے کا وعدہ کرتا ہے مگر پہلے آپ سے رقم مانگتا ہے۔ اصل امداد کبھی فیس نہیں لیتی۔")
+    if verdict == OFFICIAL_STYLE:
+        reasons_en.insert(0, "It looks like an official-style notice and asks for no money or codes, but that is not proof. Verify only via 8171.")
+        reasons_ur.insert(0, "یہ سرکاری طرز کا پیغام لگتا ہے اور اس میں رقم یا کوڈ نہیں مانگا گیا، مگر یہ ثبوت نہیں۔ صرف 8171 سے تصدیق کریں۔")
         query = "payment notifications sms 8171 no link never requests money"
-    elif verdict == "UNCERTAIN_HUMAN_REVIEW":
-        reasons_en.insert(0, "We are not sure about this message. Please confirm on the toll-free helpline before acting.")
-        reasons_ur.insert(0, "ہمیں اس پیغام کے بارے میں یقین نہیں۔ کچھ کرنے سے پہلے مفت ہیلپ لائن پر تصدیق کریں۔")
-        query = "how to report fraud helpline " + " ".join(SIGNAL_QUERIES.get(s, "") for s in sig["signals"])
+    elif verdict == NOT_GOV:
+        reasons_en.insert(0, "Low risk, but it has none of the markers of an official relief notice.")
+        reasons_ur.insert(0, "خطرہ کم ہے، مگر اس میں سرکاری امدادی پیغام کی کوئی نشانی نہیں۔")
+        query = "official sender short code 8171"
+    elif verdict == UNCERTAIN:
+        reasons_en.insert(0, "We are not sure about this message. Please confirm with the government office or 8171 before acting.")
+        reasons_ur.insert(0, "ہمیں اس پیغام کے بارے میں یقین نہیں۔ کچھ کرنے سے پہلے سرکاری دفتر یا 8171 سے تصدیق کریں۔")
+        query = "how to report fraud helpline " + " ".join(SIGNAL_QUERIES.get(x, "") for x in signals)
     else:
-        query = " ".join(SIGNAL_QUERIES.get(s, "") for s in sig["signals"]) or "no fee is ever charged"
+        query = " ".join(SIGNAL_QUERIES.get(x, "") for x in signals) or "no fee is ever charged"
+    cites = retrieve(query, k=2)
+    if fee_scam:  # always cite the no-fee policy first for advance-fee fraud
+        nofee = [c for c in retrieve(SIGNAL_QUERIES["advance_fee"], k=3) if c["section"] == "No Fee Is Ever Charged"]
+        cites = (nofee + [c for c in cites if c["section"] != "No Fee Is Ever Charged"])[:2]
     return {
-        "verdict": verdict, "color": {"SCAM": "red", "UNCERTAIN_HUMAN_REVIEW": "yellow", "LIKELY_SAFE": "green"}[verdict],
-        "probability": round(p, 4), "model_probability": round(model_p, 4), "rule_score": round(sig["rule_score"], 4),
-        "injection_detected": False, "signals": sig["signals"], "official_markers": sig["official_markers"],
-        "reasons_en": reasons_en, "reasons_ur": reasons_ur, "citations": retrieve(query, k=2),
+        "verdict": verdict, **_ui(verdict), "probability": round(p, 4), "model_probability": round(model_p, 4),
+        "rule_score": round(sig["rule_score"], 4), "injection_detected": False, "signals": signals,
+        "official_markers": official_style, "reasons_en": reasons_en, "reasons_ur": reasons_ur, "citations": cites,
         "model_version": MODEL_VERSION,
     }

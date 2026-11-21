@@ -423,7 +423,7 @@ def main() -> None:
         "runtime_seconds": round(time.time() - t0, 1),
         "total": len(results), "passed": sum(r["pass"] for r in results),
         "pass_rate": round(sum(r["pass"] for r in results) / len(results), 4),
-        "never_auto_reject": all(r in ENGINE_ROUTES or r in ("BLOCKED_PROMPT_INJECTION", "SCAM", "LIKELY_SAFE", "UNCERTAIN_HUMAN_REVIEW")
+        "never_auto_reject": all(r in ENGINE_ROUTES or r in ("BLOCKED_PROMPT_INJECTION", "SCAM", "UNCERTAIN_HUMAN_REVIEW", "NOT_A_GOV_MESSAGE", "OFFICIAL_STYLE_NOTICE")
                                  for r in routes_seen) and not any("REJECT" in r for r in routes_seen),
         "by_family": fam_rows,
         "threshold_analysis": th,
