@@ -16,27 +16,38 @@ export const PROMPT_TEXT: Record<string, Record<Lang, string>> = {
 
 let current: HTMLAudioElement | null = null;
 
-/** Resolves once playback has actually started; rejects if the file is missing or cannot play. */
+/** Resolves once playback has finished (ended, or stopped by another clip); rejects if the file is
+ * missing or cannot start, so the caller can fall through to the next voice in the chain. */
 function playUrl(url: string): Promise<void> {
   return new Promise((resolve, reject) => {
     current?.pause();
     const a = new Audio(url);
     current = a;
-    a.onerror = () => reject(new Error(`audio failed: ${url}`));
-    a.play().then(resolve, reject);
+    let started = false;
+    a.onerror = () => (started ? resolve() : reject(new Error(`audio failed: ${url}`)));
+    a.onended = () => resolve();
+    a.onpause = () => resolve();
+    a.play().then(() => { started = true; }, reject);
   });
 }
 
-function speakBrowser(text: string, lang: Lang): boolean {
-  if (typeof window === "undefined" || !("speechSynthesis" in window)) return false;
+/** Browser TTS; resolves when the utterance ends (or immediately when unsupported). */
+function speakBrowser(text: string, lang: Lang): Promise<void> {
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) return Promise.resolve();
   window.speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  u.lang = lang === "ur" ? "ur-PK" : "en-US";
-  window.speechSynthesis.speak(u);
-  return true;
+  return new Promise((resolve) => {
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = lang === "ur" ? "ur-PK" : "en-US";
+    u.onend = () => resolve();
+    u.onerror = () => resolve();
+    window.speechSynthesis.speak(u);
+    // Safety net: some engines never fire onend; never leave the button pulsing forever.
+    setTimeout(resolve, Math.min(30000, 2000 + text.length * 120));
+  });
 }
 
-/** Fallback chain so no speaker is ever silent: static clip -> /voice/tts -> speechSynthesis. */
+/** Fallback chain so no speaker is ever silent: static clip -> /voice/tts -> speechSynthesis.
+ * Resolves when playback has finished, so callers can show "playing" feedback for its whole length. */
 export async function speak(opts: { audioKey?: string | null; text?: string | null; textEn?: string | null; lang: Lang }): Promise<void> {
   const { audioKey, lang } = opts;
   if (audioKey) {
@@ -54,7 +65,7 @@ export async function speak(opts: { audioKey?: string | null; text?: string | nu
     if (!(blob instanceof Blob) || blob.size === 0) throw new Error("empty tts");
     await playUrl(URL.createObjectURL(blob));
   } catch {
-    speakBrowser(say, lang);
+    await speakBrowser(say, lang);
   }
 }
 
@@ -96,7 +107,8 @@ export default function SpeakButton({ audioKey, text, textEn, size = "md", label
         }
       }}
       aria-label={label || L("Listen", "سنیں")}
-      className={`${cls} shrink-0 rounded-full bg-yellow-300 text-black shadow ${busy ? "animate-pulse" : ""} ${className}`}
+      aria-pressed={busy}
+      className={`${cls} shrink-0 rounded-full bg-yellow-300 text-black shadow ${busy ? "animate-pulse ring-4 ring-black ring-offset-2" : ""} ${className}`}
     >
       🔊
     </button>

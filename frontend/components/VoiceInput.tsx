@@ -70,7 +70,7 @@ export default function VoiceInput({ field, onConfirm }: { field: string; onConf
           🎤 {L("Speak your answer", "جواب بول کر دیں")}
         </button>
       ) : (
-        <button type="button" onClick={dict.stop} className="w-full animate-pulse rounded-2xl border-4 border-black bg-red-200 py-4 text-xl font-bold">
+        <button type="button" onClick={dict.stop} className="w-full animate-pulse rounded-2xl border-4 border-black bg-red-200 ring-4 ring-red-600 ring-offset-2 py-4 text-xl font-bold">
           ⏹ {L("Stop", "روکیں")}
         </button>
       )}

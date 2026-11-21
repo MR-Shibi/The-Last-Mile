@@ -13,15 +13,23 @@ const CARDS = [
 ];
 
 export default function Home() {
-  const { lang, t, L } = useLang();
+  const { lang, L } = useLang();
   return (
     <>
       <AppHeader />
       <div className="mx-auto max-w-3xl px-4 py-6">
         <div className="flex items-center gap-3">
-          <h1 className="text-3xl font-bold text-brand">{t("tagline")}</h1>
+          <h1 data-testid="hero-title" className="urdu-title text-3xl font-bold text-brand">
+            {L("Government assistance, made simple", "سرکاری امداد، اب نہایت آسان")}
+          </h1>
           <SpeakButton audioKey="welcome" size="lg" />
         </div>
+        <p data-testid="hero-subtitle" className="urdu-body mt-2 text-lg text-gray-800">
+          {L(
+            "Apply for support, verify payment messages, help families, and track applications.",
+            "امداد کے لیے درخواست دیں، پیغامات کی تصدیق کریں، خاندانوں کی مدد کریں اور اپنی درخواست کا حال جانیں۔",
+          )}
+        </p>
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
           {CARDS.map((c) => (
             // Speaker is a sibling of the Link (not inside it), so tapping it can never navigate.

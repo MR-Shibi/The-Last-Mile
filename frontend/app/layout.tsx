@@ -28,7 +28,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="ur" dir="rtl" suppressHydrationWarning className={`${geistSans.variable} ${nastaliq.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
         <LanguageProvider>
-          <main className="flex-1 pb-14">{children}</main>
+          <main className="flex-1 pb-32">{children}</main>
           <PrototypeFooter />
         </LanguageProvider>
         <ServiceWorkerRegister />

@@ -11,6 +11,7 @@ export default function ReceiptCheck() {
   const { lang, L } = useLang();
   const [caseId, setCaseId] = useState("");
   const [pin, setPin] = useState("");
+  const [showPin, setShowPin] = useState(false);
   const [res, setRes] = useState<Verify | null>(null);
 
   async function check(e: React.FormEvent) {
@@ -25,7 +26,20 @@ export default function ReceiptCheck() {
       <form onSubmit={check} className="mx-auto mt-6 max-w-md space-y-4 px-4">
         <h1 className="text-3xl font-bold">{L("Check my Parchi", "اپنی پرچی چیک کریں")}</h1>
         <input dir="ltr" value={caseId} onChange={(e) => setCaseId(e.target.value)} placeholder="LM-01-000123" className="w-full rounded-xl border-4 border-black p-4 text-2xl" />
-        <input dir="ltr" inputMode="numeric" maxLength={6} value={pin} onChange={(e) => setPin(e.target.value)} placeholder="PIN" className="w-full rounded-xl border-4 border-black p-4 text-center font-mono text-3xl tracking-widest" />
+        <div className="relative" dir="ltr">
+          <input id="receipt-pin" dir="ltr" inputMode="numeric" autoComplete="off" type={showPin ? "text" : "password"} maxLength={6} value={pin} onChange={(e) => setPin(e.target.value)} placeholder="PIN" aria-label={L("6-digit PIN", "6 ہندسوں کا پن")} className="w-full rounded-xl border-4 border-black p-4 px-20 text-center font-mono text-3xl tracking-widest" />
+          <button
+            type="button"
+            onClick={() => setShowPin((s) => !s)}
+            aria-controls="receipt-pin"
+            aria-pressed={showPin}
+            aria-label={showPin ? L("Hide PIN", "پن چھپائیں") : L("Show PIN", "پن دکھائیں")}
+            className="absolute right-2 top-1/2 flex min-h-[52px] min-w-[60px] -translate-y-1/2 flex-col items-center justify-center rounded-lg border-2 border-black bg-yellow-200 px-2 text-xs font-bold"
+          >
+            <span aria-hidden className="text-2xl leading-none">{showPin ? "🙈" : "👁"}</span>
+            <span>{showPin ? L("Hide", "چھپائیں") : L("Show", "دکھائیں")}</span>
+          </button>
+        </div>
         <button className="w-full rounded-xl bg-brand py-4 text-2xl font-bold text-white">{L("Check", "چیک کریں")}</button>
         {res && (
           <div className={`rounded-2xl p-5 text-xl font-bold text-white ${res.valid ? { green: "bg-ok", yellow: "bg-warn", blue: "bg-human", red: "bg-danger" }[res.color || "blue"] : "bg-gray-700"}`} role="status">

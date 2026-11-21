@@ -79,7 +79,7 @@ export default function ScamShield() {
           {!dict.listening ? (
             <button onClick={() => { setBase(text); dict.start(); }} className="rounded-2xl border-4 border-black bg-white py-4 text-xl font-bold">🎤 {L("Speak", "بولیں")}</button>
           ) : (
-            <button onClick={dict.stop} className="animate-pulse rounded-2xl border-4 border-black bg-red-200 py-4 text-xl font-bold">⏹ {L("Stop", "روکیں")}</button>
+            <button onClick={dict.stop} className="animate-pulse rounded-2xl border-4 border-black bg-red-200 ring-4 ring-red-600 ring-offset-2 py-4 text-xl font-bold">⏹ {L("Stop", "روکیں")}</button>
           )}
           <button disabled={busy || dict.listening} onClick={() => void check()} className="rounded-2xl bg-brand py-4 text-xl font-bold text-white disabled:opacity-50">{busy ? "…" : L("Check", "چیک کریں")}</button>
         </div>
