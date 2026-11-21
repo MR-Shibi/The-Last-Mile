@@ -4,18 +4,53 @@ import { useState } from "react";
 import { api } from "@/lib/api";
 import { useLang } from "@/lib/i18n";
 import { useDictation } from "@/lib/useDictation";
+import { parseSpokenAmountDetailed, parseSpokenCnic } from "@/lib/urduNumberParser";
 import { speak } from "@/components/SpeakButton";
 
 interface SttResult { value: string | number | null; ambiguous: boolean; confirmation_en: string; confirmation_ur: string; yes_no: string | null; transcript: string }
 
-/** Mic -> continuous Web Speech transcript -> /voice/stt normaliser -> mandatory read-back
- * ("Haan Sahi Hai" / "Dobara Bolein"). Typing always works too. */
+const AMOUNT_FIELDS = new Set(["monthly_income", "age", "dependents"]);
+
+function readBack(value: string | number, transcript: string, ambiguous: boolean): SttResult {
+  return ambiguous
+    ? { value: null, ambiguous: true, transcript, yes_no: null,
+        confirmation_en: "I did not understand the number clearly. Please say it again.",
+        confirmation_ur: "میں نمبر صاف نہیں سمجھ سکی۔ براہ کرم دوبارہ بولیں۔" }
+    : { value, ambiguous: false, transcript, yes_no: null,
+        confirmation_en: `You said ${value}. Is that right? Press Haan Sahi Hai or Dobara Bolein.`,
+        confirmation_ur: `آپ نے کہا ${value}۔ کیا یہ صحیح ہے؟ 'ہاں صحیح ہے' یا 'دوبارہ بولیں' دبائیں۔` };
+}
+
+/** Parse on the device first (works offline; Urdu/Roman/English words, digit-by-digit or grouped CNICs,
+ * ڈیڑھ/ڈھائی/ساڑھے/سوا/پونے fractions). Returns null when the transcript holds no number for this field. */
+function parseLocally(field: string, transcript: string): SttResult | null {
+  if (field === "cnic") {
+    const digits = parseSpokenCnic(transcript);
+    return digits ? readBack(digits, transcript, false) : null;
+  }
+  if (AMOUNT_FIELDS.has(field)) {
+    const r = parseSpokenAmountDetailed(transcript);
+    if (r.value === null) return r.ambiguous ? readBack(0, transcript, true) : null;
+    const value = field === "monthly_income" ? Math.round(r.value) : r.value;
+    return readBack(value, transcript, r.ambiguous || (field !== "monthly_income" && !Number.isInteger(r.value)));
+  }
+  return null;
+}
+
+/** Mic -> continuous Web Speech transcript -> on-device number parser (server /voice/stt as fallback) ->
+ * mandatory read-back ("Haan Sahi Hai" / "Dobara Bolein"). Typing always works too. */
 export default function VoiceInput({ field, onConfirm }: { field: string; onConfirm: (value: string) => void }) {
   const { lang, L } = useLang();
   const [pending, setPending] = useState<SttResult | null>(null);
 
   async function normalise(transcript: string) {
     if (!transcript.trim()) return;
+    const local = parseLocally(field, transcript);
+    if (local) {
+      setPending(local);
+      void speak({ text: local.confirmation_ur, textEn: local.confirmation_en, lang });
+      return;
+    }
     try {
       const r = await api<SttResult>("/voice/stt", { body: { transcript, lang, field }, auth: false });
       setPending(r);

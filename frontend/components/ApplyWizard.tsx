@@ -4,11 +4,13 @@ import { useRef, useState } from "react";
 import { api, ApiError, type Receipt, type Scheme } from "@/lib/api";
 import { useLang } from "@/lib/i18n";
 import { formatBytes, shrinkForUpload } from "@/lib/image";
+import { formatCnic, normalizeDigits, parseSpokenAmount, parseSpokenCnic } from "@/lib/urduNumberParser";
 import { enqueue, newClientEventId, saveDraft } from "@/lib/offlineDb";
 import ConsentPanel from "@/components/ConsentPanel";
 import Parchi from "@/components/Parchi";
 import SpeakButton, { speak } from "@/components/SpeakButton";
 import VoiceInput from "@/components/VoiceInput";
+import NumericKeypad from "@/components/NumericKeypad";
 import { notifyOutboxChanged } from "@/components/AppHeader";
 
 type Q = { key: string; en: string; ur: string; kind: "text" | "number" | "cnic" | "yesno" | "province"; voice?: boolean };
@@ -62,7 +64,15 @@ export default function ApplyWizard({ scheme, citizenUserId, onCancel }: { schem
 
   function answer(value: string | number | boolean) {
     const q = QUESTIONS[step - 1];
-    const next = { ...data, [q.key]: q.kind === "number" ? Number(value) : value };
+    let v: string | number | boolean = value;
+    if (q.kind === "number") {
+      // typed digits ("15000", "1,500", "۱۵۰۰۰") or typed words ("ڈیڑھ لاکھ", "pandrah hazar")
+      const n = Number(String(value).replace(/,/g, ""));
+      v = Number.isFinite(n) ? n : (parseSpokenAmount(String(value)) ?? value);
+    } else if (q.kind === "cnic") {
+      v = parseSpokenCnic(String(value)) || String(value);
+    }
+    const next = { ...data, [q.key]: v };
     setData(next);
     setDraftVal("");
     setStep(step + 1);
@@ -189,12 +199,19 @@ export default function ApplyWizard({ scheme, citizenUserId, onCancel }: { schem
             <input
               autoFocus
               value={draft}
-              onChange={(e) => setDraftVal(e.target.value)}
+              onChange={(e) => setDraftVal(q.kind === "cnic" ? formatCnic(normalizeDigits(e.target.value)) : e.target.value)}
               inputMode={q.kind === "text" ? "text" : "numeric"}
               dir={q.kind === "text" ? undefined : "ltr"}
               placeholder={q.kind === "cnic" ? "42101-1234567-1" : ""}
               className="mt-6 w-full rounded-2xl border-4 border-black p-4 text-2xl"
             />
+            {q.kind === "cnic" && (
+              <NumericKeypad
+                onDigit={(d) => setDraftVal((cur) => formatCnic(cur.replace(/\D/g, "") + d))}
+                onBackspace={() => setDraftVal((cur) => formatCnic(cur.replace(/\D/g, "").slice(0, -1)))}
+                onClear={() => setDraftVal("")}
+              />
+            )}
             <button type="submit" disabled={!draft.trim()} className="mt-4 w-full rounded-2xl bg-brand py-5 text-2xl font-bold text-white disabled:opacity-40">
               {L("Next", "آگے")} →
             </button>

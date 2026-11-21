@@ -109,10 +109,21 @@ async function fillApplication(page: Page, a: { full_name: string; father: strin
     await nextQ(page);
   }
   const input = page.locator("form input");
-  for (const v of [a.full_name, a.father, a.cnic, String(a.age)]) {
+  for (const v of [a.full_name, a.father]) {
     await input.fill(v);
     await nextQ(page);
   }
+  // CNIC via the large on-screen keypad (noisy-room backup): digits auto-format as XXXXX-XXXXXXX-X
+  await page.getByTestId("keypad-clear").click();
+  const cnicDigits = a.cnic.replace(/\D/g, "");
+  for (const d of cnicDigits.slice(0, 12)) await page.getByTestId(`keypad-${d}`).click();
+  await page.getByTestId("keypad-9").click();    // a slip of the finger...
+  await page.getByTestId("keypad-back").click(); // ...corrected with backspace
+  await page.getByTestId(`keypad-${cnicDigits[12]}`).click();
+  await expect(input).toHaveValue(a.cnic);
+  await nextQ(page);
+  await input.fill(String(a.age));
+  await nextQ(page);
   await page.getByRole("button", { name: "Sindh" }).click();
   await page.getByRole("button", { name: /Yes/ }).click(); // widow
   await input.fill(String(a.income));

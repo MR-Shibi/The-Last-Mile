@@ -140,7 +140,7 @@ Family PINs (shared-phone unlock/consent) follow the seed rule `family N → f"{
 | Scam Shield classifier + RAG | **Real model, synthetic data** | TF-IDF + LogisticRegression trained on 205 synthetic SMS; extractive RAG over simulated policy markdown |
 | Anomaly model | **Real model, synthetic data** | IsolationForest on a synthetic applicant population |
 | Urdu voice prompts | **Real audio** | 12 MP3s pre-generated with gTTS, served offline by the PWA |
-| Speech-to-text | **Browser Web Speech API** | Server normalises the transcript (Urdu digits, number words, CNIC, yes/no); Whisper not bundled |
+| Speech-to-text | **Browser Web Speech API** | Spoken numbers are parsed **on the device**, so this works offline (`frontend/lib/urduNumberParser.ts`). It handles Urdu, Roman Urdu and English. CNICs can be spoken digit by digit or in groups, in any mix. Amounts support سو / ہزار / لاکھ / ملین / کروڑ / ارب and the fractions ڈیڑھ, ڈھائی, ساڑھے, سوا and پونے. The server `/voice/stt` is the fallback, and Whisper is not bundled. A large 0–9 keypad backs up the CNIC field. |
 | Offline outbox + idempotent sync | **Real** | IndexedDB + `client_event_id`; replay-safe `/sync` |
 | NADRA identity, Raast payments, registry QR | **Simulated** | `/mock/*` rails over a 50-row synthetic registry with deliberate dirty data |
 | CNIC check digit | **Simulated** | Real CNICs have no public checksum; a documented synthetic rule is used |
