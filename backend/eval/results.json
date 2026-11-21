@@ -1,6 +1,6 @@
 {
- "generated_at": "2026-11-21T09:40:50+00:00",
- "runtime_seconds": 152.6,
+ "generated_at": "2026-11-21T10:19:46+00:00",
+ "runtime_seconds": 143.8,
  "total": 548,
  "passed": 548,
  "pass_rate": 1.0,
@@ -154,17 +154,17 @@
  },
  "scam_metrics": {
   "n": 44,
-  "true_positive": 25,
+  "true_positive": 22,
   "false_positive": 0,
-  "true_negative": 15,
+  "true_negative": 13,
   "false_negative": 0,
-  "uncertain_scam": 2,
-  "uncertain_legit": 2,
+  "uncertain_scam": 5,
+  "uncertain_legit": 4,
   "precision": 1.0,
-  "recall_flagged_as_scam": 0.9259,
+  "recall_flagged_as_scam": 0.8148,
   "recall_incl_human_review": 1.0,
   "false_alarm_rate": 0.0,
-  "legit_sent_to_review_rate": 0.1176,
+  "legit_sent_to_review_rate": 0.2353,
   "missed_scam_rate": 0.0
  },
  "forensics_metrics": {

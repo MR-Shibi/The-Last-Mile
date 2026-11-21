@@ -315,6 +315,11 @@ test("6 — Scam Shield flags the sample scam SMS with a policy citation", async
   await expect(verdict).toHaveAttribute("data-verdict", "NOT_A_GOV_MESSAGE");
   await expect(page.getByText(/100%/)).toHaveCount(0);
 
+  // A clean Prime Minister Scheme payout notice (no fee/PIN/number/link) is never a SCAM
+  await page.locator("textarea").fill("السلام علیکم اپ کے نمبر ڈیش پر 2000 روپے پرائم منسٹر سکیم سے ریسیو ہو گئے ہیں، اپ اس کو ریسیو کرنے کے لیے کسی بھی نزدیک کمیونیکیشن سٹور سے ریسیو کر سکتے ہیں یا ان لائن پیمنٹ فارم یا ان لائن پلیٹ فارم پر جا کر اپ ان لائن پیمنٹ بھی ریسیو کر سکتے ہیں");
+  await page.getByRole("button", { name: "Check", exact: true }).click();
+  await expect(verdict).toHaveAttribute("data-verdict", "UNCERTAIN_HUMAN_REVIEW");
+
   // Urdu-script advance-fee lure is a SCAM, not "not sure"
   await page.locator("textarea").fill("آپ کو 10 ہزار روپے ملے ہیں آپ ان 10 ہزار روپے میں سے ہمیں 200 روپے بھیج دیں تاکہ ہم آپ کو یہ 10 ہزار بھیج سکیں");
   await page.getByRole("button", { name: "Check", exact: true }).click();

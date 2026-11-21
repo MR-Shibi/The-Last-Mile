@@ -245,10 +245,10 @@ def test_borderline_probability_routes_to_human_review():
     assert verdict_from_probability(0.34) == "NOT_A_GOV_MESSAGE"
     assert verdict_from_probability(0.34, official_style=True) == "OFFICIAL_STYLE_NOTICE"
     assert verdict_from_probability(0.35) == "UNCERTAIN_HUMAN_REVIEW"
-    assert verdict_from_probability(0.69) == "UNCERTAIN_HUMAN_REVIEW"
-    assert verdict_from_probability(0.70) == "SCAM"
+    assert verdict_from_probability(0.74) == "UNCERTAIN_HUMAN_REVIEW"
+    assert verdict_from_probability(0.75) == "SCAM"
     r = check_sms("BISP payment update. Call 0300-5551234 for details.")
-    assert 0.35 <= r["probability"] < 0.70 and r["verdict"] == "UNCERTAIN_HUMAN_REVIEW"
+    assert 0.35 <= r["probability"] < 0.75 and r["verdict"] == "UNCERTAIN_HUMAN_REVIEW"
 
 
 def test_policy_rag_returns_grounded_citations(client):

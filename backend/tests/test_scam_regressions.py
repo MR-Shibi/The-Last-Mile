@@ -2,7 +2,8 @@
 never presenting a low-risk message as a government message)."""
 import pytest
 
-from app.ml.scam_shield import advance_fee, check_sms
+from app.ml.scam_data import build_corpus
+from app.ml.scam_shield import SCAM_INDICATORS, advance_fee, check_sms, risk_signals
 
 ADVANCE_FEE_UR = "آپ کو 10 ہزار روپے ملے ہیں آپ ان 10 ہزار روپے میں سے ہمیں 200 روپے بھیج دیں تاکہ ہم آپ کو یہ 10 ہزار بھیج سکیں"
 ADVANCE_FEE_UR_LONG = ("آپ کو 10 ہزار روپے ملے ہیں آپ ان 10 ہزار روپے میں سے آپ ایسے کریں ہمیں 200 روپے بھیج دیں "
@@ -60,3 +61,66 @@ def test_api_returns_new_verdicts(client):
     b = client.post("/scam/check", json={"text": CASUAL_UR}).json()
     assert a["verdict"] == "SCAM" and b["verdict"] == "NOT_A_GOV_MESSAGE"
     assert {"headline_en", "headline_ur", "color"} <= set(a) and b["color"] == "neutral"
+
+
+# ------------------------------------------------------------------ relief notices are never SCAM without a red flag
+PM_SCHEME = ("السلام علیکم اپ کے نمبر ڈیش پر 2000 روپے پرائم منسٹر سکیم سے ریسیو ہو گئے ہیں، اپ اس کو ریسیو کرنے کے لیے "
+             "کسی بھی نزدیک کمیونیکیشن سٹور سے ریسیو کر سکتے ہیں یا ان لائن پیمنٹ فارم یا ان لائن پلیٹ فارم پر جا کر اپ "
+             "ان لائن پیمنٹ بھی ریسیو کر سکتے ہیں")
+
+
+def test_1_prime_minister_scheme_payout_is_never_scam():
+    r = check_sms(PM_SCHEME)
+    assert r["verdict"] in {"UNCERTAIN_HUMAN_REVIEW", "OFFICIAL_STYLE_NOTICE"}, r["verdict"]
+    assert r["scam_indicators"] == []
+    # no 8171 + an unspecified "online platform" -> needs verification, with the specific Urdu guidance
+    assert r["verdict"] == "UNCERTAIN_HUMAN_REVIEW" and 0.40 <= r["probability"] <= 0.65
+    assert "آن لائن پلیٹ فارم استعمال کرنے سے پہلے 8171" in r["reasons_ur"][0]
+
+
+def test_1b_held_out_paraphrase_with_apne_is_never_scam():
+    # "اپنے" contains the letters of "پن" (PIN): must not be read as a PIN request
+    r = check_sms("وزیر اعظم پیکج: آپ کے لیے 3000 روپے جاری ہوئے ہیں، اپنے قریبی ریٹیلر سے وصول کریں")
+    assert r["verdict"] != "SCAM" and "pin_otp_request" not in r["signals"]
+
+
+def test_2_8171_biometric_shop_collection_is_official_notice():
+    r = check_sms("8171: آپ کی 10500 روپے کی قسط تیار ہے۔ قریبی دکان پر بائیومیٹرک تصدیق کے بعد وصول کریں۔")
+    assert r["verdict"] == "OFFICIAL_STYLE_NOTICE" and r["color"] == "green"
+
+
+def test_3_ten_thousand_send_two_hundred_is_still_scam():
+    r = check_sms(ADVANCE_FEE_UR)
+    assert r["verdict"] == "SCAM" and "advance_fee" in r["scam_indicators"]
+
+
+@pytest.mark.parametrize("text", ["ہائے", "ہیلو", "Hi", "Hello bhai", "Kal 5000 rupay ka saman le aana"])
+def test_4_casual_greetings_are_not_government_messages(text):
+    assert check_sms(text)["verdict"] == "NOT_A_GOV_MESSAGE"
+
+
+@pytest.mark.parametrize("text,indicator", [
+    ("پرائم منسٹر سکیم: 2000 روپے وصول کرنے کے لیے اپنا پن کوڈ بتائیں", "pin_otp_request"),
+    ("BISP: aap ki raqam block ho jayegi agar aaj verify na kiya", "threat"),
+    ("Prime Minister scheme ki raqam ke liye is number par WhatsApp karein", "personal_number"),
+    ("Ehsaas raqam claim karein: bisp-online.blogspot.com", "suspicious_link"),
+    ("شناختی کارڈ کی تصویر بھیجیں تاکہ 2000 روپے جاری ہوں", "pin_otp_request"),
+])
+def test_each_concrete_indicator_is_detected(text, indicator):
+    assert indicator in check_sms(text)["scam_indicators"]
+
+
+def test_gov_pk_links_are_not_suspicious():
+    assert "suspicious_link" not in risk_signals("Details: https://www.bisp.gov.pk/payments")["signals"]
+    assert "suspicious_link" in risk_signals("Details: https://bisp-payments.xyz")["signals"]
+
+
+def test_property_no_scam_verdict_without_a_concrete_indicator():
+    """Relief wording alone can never produce SCAM, whatever the classifier thinks."""
+    texts = [x["text"] for x in build_corpus()] + [PM_SCHEME, "مبارک ہو آپ کو انعام ملا ہے", "Prime Minister scheme se 5000 rupay receive ho gaye"]
+    for t in texts:
+        r = check_sms(t)
+        if r["verdict"] == "SCAM":
+            assert set(r["scam_indicators"]) & SCAM_INDICATORS, t
+        if not r.get("scam_indicators"):
+            assert r["verdict"] != "SCAM", t

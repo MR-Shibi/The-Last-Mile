@@ -18,19 +18,23 @@ from sklearn.pipeline import FeatureUnion, Pipeline
 
 from app.ml.scam_data import build_corpus
 
-MODEL_VERSION = "scamshield-tfidf-lr-v2 (advance-fee rule)"
-SCAM_THRESHOLD = 0.70
+MODEL_VERSION = "scamshield-tfidf-lr-v3 (indicator-gated)"
+SCAM_THRESHOLD = 0.75
 UNCERTAIN_LOW = 0.35
+RELIEF_UNCERTAIN_BAND = (0.40, 0.65)
 ADVANCE_FEE_FLOOR = 0.94
 SCAM, UNCERTAIN = "SCAM", "UNCERTAIN_HUMAN_REVIEW"
 NOT_GOV, OFFICIAL_STYLE = "NOT_A_GOV_MESSAGE", "OFFICIAL_STYLE_NOTICE"
+RELIEF_GUIDANCE_UR = "اس پیغام میں فیس یا پن نہیں مانگا گیا، لیکن آن لائن پلیٹ فارم استعمال کرنے سے پہلے 8171 یا قریبی مجاز دکان سے تصدیق ضرور کریں۔"
+RELIEF_GUIDANCE_EN = ("This message asks for no fee or PIN, but verify with 8171 or an authorised shop before using any "
+                      "online platform it mentions.")
 # Low risk is NOT proof of authenticity: a low-risk message is only "official-style" when it also carries
 # the verified relief markers below; anything else is simply "not a government relief message".
 VERDICT_UI = {
     SCAM: ("red", "Danger: this is a scam/spam message — do not send any fee or money.",
            "خطرہ: یہ دھوکہ دہی (Scam/Spam) کا پیغام ہے — کوئی فیس یا رقم نہ بھیجیں"),
-    UNCERTAIN: ("amber", "Not sure — verify with the government office or 8171 before acting.",
-                "تصدیق نہیں ہو سکی (Not Sure) — سرکاری دفتر یا 8171 سے تصدیق کریں"),
+    UNCERTAIN: ("amber", "Not sure (needs verification) — verify with the government office or 8171 before acting.",
+                "تصدیق طلب (Not Sure) — سرکاری دفتر یا 8171 سے تصدیق کریں"),
     NOT_GOV: ("neutral", "This is not a government relief message.",
               "یہ سرکاری امدادی پیغام نہیں ہے (Not a Government Relief Message)"),
     OFFICIAL_STYLE: ("green", "Official-style information message (please verify only via 8171). Not a guarantee.",
@@ -74,23 +78,34 @@ def detect_injection(text: str | None) -> dict:
 
 # ----------------------------------------------------------------- explainable risk signals
 SIGNALS = {
-    "fee_request": (r"\bfee\b|charges?|deposit|\btax\b|advance|bhej(en|na|o|ein|\s*d(ein|o|e))|jama\s*kar|processing|registration\s+charge"
+    # (a) advance-fee / payment demand
+    "fee_request": (r"\bfee\b|\bcharges\b|\btax\b|advance|bhej(en|na|o|ein|\s*d(ein|o|e))|jama\s*kar|security\s+deposit|registration\s+charge"
                     r"|فیس|بھیجیں|بھیج\s*د(یں|و|ے)|بھجوا|جمع\s*(کروائیں|کرائیں|کرا\s*دیں)|ٹیکس|ایڈوانس|چارجز|سیکیورٹی"
                     r"|easypaisa|jazzcash|ایزی\s*پیسہ|جاز\s*کیش",
                     0.6, ("Asks you to pay a fee or send money first.", "پہلے فیس یا رقم بھیجنے کو کہتا ہے۔")),
-    "pin_otp_request": (r"\bpin\b|\botp\b|verification\s+code|4\s*digit\s+code|password|account\s+number"
-                        r"|پن|پن\s*کوڈ|او\s*ٹی\s*پی|اکاؤنٹ\s*نمبر|اکاونٹ\s*نمبر",
-                        0.5, ("Asks for your PIN or OTP code.", "آپ کا پن یا او ٹی پی کوڈ مانگتا ہے۔")),
-    "suspicious_link": (r"https?://|www\.|bit\.ly|tinyurl|\b[\w-]+\.(com|net|org|site|xyz|top|click|info|online|live|link|pk|me)\b"
+    # (b) credential / OTP / document phishing ("پن" only as a whole word: it also occurs inside اپنا / اپنے)
+    "pin_otp_request": (r"\bpin\b|\botp\b|verification\s+code|4\s*digit\s+code|password|account\s+number|cnic\s+(ki\s+)?(photo|picture|tasveer)"
+                        r"|(?<![\u0600-\u06FF])پن(?![\u0600-\u06FF])|پن\s*کوڈ|او\s*ٹی\s*پی|پاس\s*ورڈ|اکاؤنٹ\s*نمبر|اکاونٹ\s*نمبر|شناختی\s*کارڈ\s*کی\s*(تصویر|کاپی)",
+                        0.5, ("Asks for your PIN, OTP, password or ID documents.", "آپ کا پن، او ٹی پی، پاس ورڈ یا شناختی دستاویز مانگتا ہے۔")),
+    # (c) coercion / account-block threat
+    "threat": (r"block|cancel|final\s+notice|last\s+chance|expire|within\s+\d+\s+hours|warna|\d+\s*ghante"
+               r"|بلاک|منسوخ|آخری\s*موقع|\d+\s*گھنٹے|ورنہ|ختم\s+ہو\s+جائے",
+               0.35, ("Threatens that your money or account will be blocked or cancelled.", "رقم یا اکاؤنٹ بند/منسوخ ہونے کی دھمکی دیتا ہے۔")),
+    # (d) suspicious non-.gov.pk link (official .gov.pk domains are stripped before matching)
+    "suspicious_link": (r"https?://|www\.|bit\.ly|tinyurl|blogspot|\b[\w-]+\.(com|net|org|site|xyz|top|click|info|online|live|link|pk|me)\b"
                         r"|/claim|/apply",
-                        0.4, ("Contains a link that is not official.", "اس میں غیر سرکاری لنک ہے۔")),
-    "urgency": (r"urgent|immediately|final\s+notice|expire|within\s+\d+\s+hours|foran|jaldi|fori|warna|فوری|ختم\s+ہو\s+جائے",
-                0.2, ("Creates panic or a deadline.", "جلدی یا ڈر پیدا کرتا ہے۔")),
+                        0.4, ("Contains a link that is not an official .gov.pk site.", "اس میں غیر سرکاری (gov.pk کے علاوہ) لنک ہے۔")),
+    # (d) personal mobile / WhatsApp contact trap
+    "personal_number": (r"\b03\d{2}[-\s]?\d{7}\b|whats\s*app|واٹس\s*ایپ", 0.25,
+                        ("Asks you to contact a personal mobile or WhatsApp number.", "ذاتی موبائل یا واٹس ایپ نمبر پر رابطے کو کہتا ہے۔")),
+    # weak context (never sufficient for SCAM on its own)
+    "urgency": (r"urgent|immediately|foran|jaldi|fori|فوری|فوراً|جلدی",
+                0.15, ("Creates panic or a deadline.", "جلدی یا ڈر پیدا کرتا ہے۔")),
     "prize_lure": (r"\bwon\b|winner|lucky\s+draw|inaam|bonus|congratulations|mubarak|انعام|بونس|قرعہ|مبارک",
                    0.2, ("Promises a prize or lucky draw.", "انعام یا قرعہ اندازی کا وعدہ کرتا ہے۔")),
-    "personal_number": (r"\b03\d{2}[-\s]?\d{7}\b", 0.25, ("Sent from or asks you to call a personal mobile number.",
-                                                         "ذاتی موبائل نمبر سے آیا ہے یا اس پر رابطے کو کہتا ہے۔")),
 }
+# A SCAM verdict requires at least one of these concrete indicators. Relief wording alone never suffices.
+SCAM_INDICATORS = {"advance_fee", "fee_request", "pin_otp_request", "threat", "suspicious_link", "personal_number"}
 OFFICIAL_MARKERS = r"^\s*8171\b|no\s+fee|koi\s+fee\s+nahi|کوئی\s+فیس\s+نہیں|0800-26477|never\s+share|kisi\s+ko\s+na\s+batayen"
 _SIG = {k: (re.compile(p, re.I), w, txt) for k, (p, w, txt) in SIGNALS.items()}
 _OFFICIAL = re.compile(OFFICIAL_MARKERS, re.I)
@@ -116,6 +131,20 @@ _PROTECTIVE = re.compile(
 _EXPLICIT_SEND = re.compile(r"بھیج|bhej|\bsend\b|transfer|easypaisa|jazzcash|ایزی\s*پیسہ|جاز\s*کیش|\b03\d{2}[-\s]?\d{7}\b", re.I)
 
 
+# Relief / disbursement announcement wording (NOT a scam indicator by itself).
+_RELIEF_PAYOUT = re.compile(
+    r"\b8171\b|بے\s*نظیر|بینظیر|پرائم\s*منسٹر|وزیر\s*اعظم|احساس|کفالت|ریسیو|وصول|قسط|امداد|وظیفہ|انعام|بونس|مبارک"
+    r"|\bBISP\b|benazir|ehsaas|kafalat|prime\s+minister|\bqist\b|relief|\bgrant\b|payment\s+(of|is|has)|inaam|bonus|mubarak|prize|\bwon\b",
+    re.I)
+# Strong official markers that may make a clean relief notice "official-style".
+_STRONG_OFFICIAL = re.compile(
+    r"\b8171\b|بائیو\s*میٹرک|biometric|\bBISP\b|benazir\s+income\s+support|بے\s*نظیر\s*انکم\s*سپورٹ|بینظیر\s*انکم\s*سپورٹ"
+    r"|کوئی\s+فیس\s+نہیں|koi\s+fee\s+nahi|no\s+fee|sindh\s+social\s+protection|punjab\s+relief\s+dept|سندھ\s+سوشل\s+پروٹیکشن",
+    re.I)
+# Vague, unverified online channels ("online platform", "online payment form") without a URL.
+_VAGUE_ONLINE = re.compile(r"(ان|آن)\s*لائن|online\s+(platform|form|payment|portal)|website", re.I)
+
+
 def advance_fee(text: str) -> bool:
     if not (_PROMISE.search(text) and _SEND_BACK.search(text)):
         return False
@@ -123,8 +152,9 @@ def advance_fee(text: str) -> bool:
 
 
 def is_official_style(text: str) -> bool:
-    return bool(_OFFICIAL_RELIEF.search(text))
-_NO_FEE = re.compile(r"no\s+fee|koi\s+fee\s+nahi|کوئی\s+فیس\s+نہیں|free\s+of\s+charge|is\s+free", re.I)
+    return bool(_STRONG_OFFICIAL.search(text))
+_NO_FEE = re.compile(r"no\s+(fee|charges)|koi\s+(fee|charges)\s+nahi|کوئی\s+فیس\s+نہیں|free\s+of\s+charge|is\s+free|charges\s+apply", re.I)
+_GOV_PK = re.compile(r"(https?://)?(www\.)?[\w.-]+\.gov\.pk\S*", re.I)
 _SEND_MONEY = re.compile(r"bhej|send|transfer|pay\s|بھیجیں|easypaisa|jazzcash|deposit", re.I)
 # Messages with no money / relief vocabulary at all are out of scope (e.g. family chat).
 _RELIEF_CONTEXT = re.compile(
@@ -133,7 +163,8 @@ _RELIEF_CONTEXT = re.compile(
 
 
 def risk_signals(text: str) -> dict:
-    hits = [k for k, (rx, _, _) in _SIG.items() if rx.search(text)]
+    scan = _GOV_PK.sub(" ", text)  # official .gov.pk links are not "suspicious"
+    hits = [k for k, (rx, _, _) in _SIG.items() if rx.search(scan)]
     official = bool(_OFFICIAL.search(text))
     # "never share your PIN" mentions PIN but is protective, not a request
     if official and "pin_otp_request" in hits and re.search(r"never\s+share|na\s+batayen|نہ\s+بتائیں", text, re.I):
@@ -243,6 +274,7 @@ SIGNAL_QUERIES = {
     "prize_lure": "lucky draw won prize lures",
     "personal_number": "official sender short code ordinary mobile numbers",
     "advance_fee": "no fee is ever charged fee tax registration processing deposit send money",
+    "threat": "urgency lucky draw lures final notice pressure",
 }
 
 
@@ -272,17 +304,32 @@ def check_sms(text: str) -> dict:
     official_style = is_official_style(clean)
     fee_scam = advance_fee(clean)
     signals = (["advance_fee"] if fee_scam else []) + sig["signals"]
-    if not signals and not official_style and not _RELIEF_CONTEXT.search(clean):
+    indicators = [x for x in signals if x in SCAM_INDICATORS]
+    relief = bool(_RELIEF_PAYOUT.search(clean))
+    vague_online = bool(_VAGUE_ONLINE.search(clean))
+    if not indicators and not relief and not official_style:
         return {"verdict": NOT_GOV, **_ui(NOT_GOV), "probability": 0.05, "model_probability": None, "rule_score": 0.0,
-                "injection_detected": False, "signals": [], "official_markers": False, "out_of_scope": True,
-                "reasons_en": ["This message is not about money or relief payments, so it is not a government relief message."],
-                "reasons_ur": ["یہ پیغام رقم یا امدادی ادائیگی کے بارے میں نہیں، اس لیے یہ سرکاری امدادی پیغام نہیں ہے۔"],
+                "injection_detected": False, "signals": signals, "official_markers": False, "out_of_scope": True,
+                "scam_indicators": [],
+                "reasons_en": ["This message has no relief or payment-scheme wording and no scam signs, so it is not a government relief message."],
+                "reasons_ur": ["اس پیغام میں نہ امدادی اسکیم کا ذکر ہے نہ دھوکے کی نشانی، اس لیے یہ سرکاری امدادی پیغام نہیں ہے۔"],
                 "citations": [], "model_version": MODEL_VERSION}
     model_p = float(get_model().predict_proba([clean])[0][1])
     p = float(np.clip(0.65 * model_p + 0.35 * sig["rule_score"], 0, 1))
+    relief_guidance = False
     if fee_scam:
         p = max(p, ADVANCE_FEE_FLOOR)  # hard rule: promising money but asking for money first is always a scam
-    verdict = verdict_from_probability(p, official_style)
+    if indicators:
+        verdict = SCAM if p >= SCAM_THRESHOLD else UNCERTAIN  # a concrete red flag is never "safe"
+        if verdict == UNCERTAIN:
+            p = max(p, RELIEF_UNCERTAIN_BAND[0])
+    elif official_style and not vague_online:
+        verdict, p = OFFICIAL_STYLE, min(p, 0.30)
+    else:
+        # Relief/payout wording with ZERO scam indicators: never SCAM. Without official markers, or when it
+        # points to an unspecified "online platform", it needs verification.
+        verdict, relief_guidance = UNCERTAIN, True
+        p = float(np.clip(p, *RELIEF_UNCERTAIN_BAND))
     reasons_en = [_SIG[x][2][0] for x in sig["signals"]]
     reasons_ur = [_SIG[x][2][1] for x in sig["signals"]]
     if fee_scam:
@@ -296,6 +343,10 @@ def check_sms(text: str) -> dict:
         reasons_en.insert(0, "Low risk, but it has none of the markers of an official relief notice.")
         reasons_ur.insert(0, "خطرہ کم ہے، مگر اس میں سرکاری امدادی پیغام کی کوئی نشانی نہیں۔")
         query = "official sender short code 8171"
+    elif verdict == UNCERTAIN and relief_guidance:
+        reasons_en.insert(0, RELIEF_GUIDANCE_EN)
+        reasons_ur.insert(0, RELIEF_GUIDANCE_UR)
+        query = "payment collection authorised campsites partner bank official sender 8171"
     elif verdict == UNCERTAIN:
         reasons_en.insert(0, "We are not sure about this message. Please confirm with the government office or 8171 before acting.")
         reasons_ur.insert(0, "ہمیں اس پیغام کے بارے میں یقین نہیں۔ کچھ کرنے سے پہلے سرکاری دفتر یا 8171 سے تصدیق کریں۔")
@@ -308,7 +359,7 @@ def check_sms(text: str) -> dict:
         cites = (nofee + [c for c in cites if c["section"] != "No Fee Is Ever Charged"])[:2]
     return {
         "verdict": verdict, **_ui(verdict), "probability": round(p, 4), "model_probability": round(model_p, 4),
-        "rule_score": round(sig["rule_score"], 4), "injection_detected": False, "signals": signals,
+        "rule_score": round(sig["rule_score"], 4), "injection_detected": False, "signals": signals, "scam_indicators": indicators,
         "official_markers": official_style, "reasons_en": reasons_en, "reasons_ur": reasons_ur, "citations": cites,
         "model_version": MODEL_VERSION,
     }

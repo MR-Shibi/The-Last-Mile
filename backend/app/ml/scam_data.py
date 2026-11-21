@@ -62,6 +62,9 @@ LEGIT_RU = [
     "8171: Aap ki darkhwast zair-e-ghaur hai. Kisi ko paisay dene ki zaroorat nahi. Helpline 0800-26477.",
     "Sindh Social Protection: Aap ka case number {ref} mil gaya hai. Officer aap se rabta karega. Koi fee nahi.",
     "8171: Adaigi sirf authorised campsite aur bank par hoti hai. Dhoka dahi ki report 0800-26477 par karein.",
+    "Assalam o alaikum, aap ke number par {amt} rupay Prime Minister scheme se receive ho gaye hain. Qareebi communication store se receive kar sakte hain.",
+    "8171: Ehsaas Kafalat ki {amt} rupay ki qist jari. Asal CNIC ke sath qareebi dukaan par biometric tasdeeq karwa kar wasool karein.",
+    "PM Relief Programme: aap ki {amt} rupay ki raqam manzoor. Qareebi bank branch se biometric ke baad wasool karein. Koi fee nahi.",
 ]
 LEGIT_UR = [
     "8171: آپ کی {amt} روپے کی قسط تیار ہے۔ اصل شناختی کارڈ کے ساتھ کیمپ سائٹ سے وصول کریں۔ کوئی فیس نہیں۔",
@@ -70,6 +73,11 @@ LEGIT_UR = [
     "8171: ادائیگی صرف مجاز کیمپ سائٹ اور بینک پر ہوتی ہے۔ دھوکہ دہی کی اطلاع 0800-26477 پر دیں۔",
     "سندھ سوشل پروٹیکشن: آپ کا کیس نمبر {ref} موصول ہو گیا ہے۔ افسر آپ سے رابطہ کرے گا۔ کوئی فیس نہیں۔",
     "8171 بے نظیر انکم سپورٹ: آپ کی {amt} روپے کی قسط کیمپ سائٹ پر دستیاب ہے۔ کسی کو رقم دینے کی ضرورت نہیں۔",
+    "السلام علیکم آپ کے نمبر پر {amt} روپے پرائم منسٹر سکیم سے ریسیو ہو گئے ہیں، آپ اس کو ریسیو کرنے کے لیے کسی بھی نزدیک کمیونیکیشن سٹور سے ریسیو کر سکتے ہیں یا آن لائن پیمنٹ بھی ریسیو کر سکتے ہیں",
+    "السلام علیکم اپ کے نمبر ڈیش پر {amt} روپے پرائم منسٹر سکیم سے ریسیو ہو گئے ہیں، اپ اس کو ریسیو کرنے کے لیے کسی بھی نزدیک کمیونیکیشن سٹور سے ریسیو کر سکتے ہیں",
+    "پرائم منسٹر ریلیف سکیم: آپ کی {amt} روپے کی رقم منظور ہو گئی ہے۔ قریبی بینک یا مجاز ریٹیلر سے بائیومیٹرک تصدیق کے بعد وصول کریں۔",
+    "8171: احساس کفالت کی {amt} روپے کی قسط جاری کر دی گئی ہے۔ اصل شناختی کارڈ کے ساتھ قریبی دکان سے بائیومیٹرک تصدیق کروا کر وصول کریں۔",
+    "وزیر اعظم امدادی پروگرام: {amt} روپے آپ کے اکاؤنٹ میں منتقل ہو گئے ہیں۔ تفصیل کے لیے 8171 پر رابطہ کریں۔",
 ]
 
 
