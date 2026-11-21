@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import DecisionModal from "@/components/DecisionModal";
 import Icon from "@/components/Icon";
-import { logout, useSession } from "@/lib/api";
+import { FLASH_KEY, logoutAndGoHome, ROLE_LABEL, useSession } from "@/lib/api";
 import { useLang } from "@/lib/i18n";
-import { useOnline } from "@/lib/stores";
-import { listOutbox } from "@/lib/offlineDb";
+import { useOnline, useSessionValue, writeSessionValue } from "@/lib/stores";
+import { listOutbox, ownedBy } from "@/lib/offlineDb";
 import { flushOutbox } from "@/lib/sync";
 
 /** Shared header: brand + Home/Back, live connectivity pill, pending-outbox badge (auto-sync on reconnect),
@@ -20,14 +21,24 @@ export default function AppHeader({ title }: { title?: string }) {
   const router = useRouter();
   const pathname = usePathname();
   const isHome = pathname === "/";
+  const flash = useSessionValue(FLASH_KEY);
+  const userId = session?.user_id;
 
+  // One-shot "Logged out successfully" banner, auto-hidden after 6 s
+  useEffect(() => {
+    if (!flash) return;
+    const t = window.setTimeout(() => writeSessionValue(FLASH_KEY, null), 6000);
+    return () => window.clearTimeout(t);
+  }, [flash]);
+
+  // Pending uploads that belong to the account on this phone right now
   const refreshCount = useCallback(async () => {
     try {
-      setPending((await listOutbox()).length);
+      setPending((await listOutbox()).filter((i) => ownedBy(i, userId)).length);
     } catch {
       setPending(0);
     }
-  }, []);
+  }, [userId]);
 
   const trySync = useCallback(async () => {
     await flushOutbox();
@@ -118,23 +129,48 @@ export default function AppHeader({ title }: { title?: string }) {
         )}
         <div className="flex-1" />
         {session ? (
-          <button
-            type="button"
-            onClick={() => {
-              logout();
-              router.push("/");
-            }}
-            className={navBtn}
-          >
-            <Icon name="logout" size={20} /> <span className="hidden min-[400px]:inline">{L("Logout", "لاگ آؤٹ")}</span>
-            <span className="sr-only min-[400px]:hidden">{L("Logout", "لاگ آؤٹ")}</span>
-          </button>
+          <>
+            <span
+              data-testid="account-badge"
+              data-role={session.role}
+              className="order-last inline-flex min-h-[40px] w-full min-w-0 items-center gap-1.5 rounded-xl bg-gold px-3 text-base font-bold text-ink sm:order-none sm:w-auto sm:max-w-[22rem]"
+              title={`${session.full_name} — ${ROLE_LABEL[session.role][0]}`}
+            >
+              <Icon name="users" size={18} strokeWidth={2.5} />
+              <span className="truncate">
+                {L("Logged in:", "لاگ ان:")} {L(ROLE_LABEL[session.role][0], ROLE_LABEL[session.role][1])}
+                <span className="font-normal"> · <span dir="auto">{session.full_name}</span></span>
+              </span>
+            </span>
+            <button
+              type="button"
+              data-testid="logout-button"
+              onClick={() => void logoutAndGoHome()}
+              className={`${navBtn} border-2 border-white/70`}
+            >
+              <Icon name="logout" size={20} /> {L("Logout", "لاگ آؤٹ")}
+            </button>
+          </>
         ) : (
           <Link href="/login" className={`${navBtn} text-base text-white/90`}>
             <Icon name="login" size={20} /> {L("Staff & Role Login", "عملہ و کردار لاگ ان")}
           </Link>
         )}
       </nav>
+      {flash === "logged_out" && (
+        <div role="status" data-testid="logout-toast" className="border-t-2 border-gold bg-tint text-brand">
+          <div className="mx-auto flex max-w-6xl items-center gap-2 px-3 py-2 text-lg font-bold">
+            <Icon name="checkCircle" size={22} />
+            <span className="flex-1">
+              <span dir="ltr" className="inline-block">Logged out successfully</span> / <span className="urdu">کامیابی سے لاگ آؤٹ ہو گئے</span>
+            </span>
+            <button type="button" onClick={() => writeSessionValue(FLASH_KEY, null)} className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl hover:bg-white" aria-label={L("Close", "بند کریں")}>
+              <Icon name="x" size={20} />
+            </button>
+          </div>
+        </div>
+      )}
+      <DecisionModal />
     </header>
   );
 }

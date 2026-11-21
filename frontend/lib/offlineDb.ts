@@ -13,6 +13,8 @@ export interface OutboxItem {
   created_at: number;
   attempts: number;
   family_id?: number;
+  /** Account that queued it: an item is only ever synced with that same account's token. */
+  owner_user_id?: number;
 }
 
 interface LastMileDB extends DBSchema {
@@ -42,10 +44,27 @@ export function newClientEventId(): string {
 }
 
 export async function enqueue(kind: OutboxKind, payload: Record<string, unknown>, family_id?: number, client_event_id?: string): Promise<OutboxItem> {
-  const item: OutboxItem = { client_event_id: client_event_id || newClientEventId(), kind, payload, created_at: Date.now(), attempts: 0, family_id };
+  const item: OutboxItem = {
+    client_event_id: client_event_id || newClientEventId(), kind, payload, created_at: Date.now(), attempts: 0, family_id,
+    owner_user_id: currentUserId(),
+  };
   const db = await getDb();
   await db.put("outbox", item);
   return item;
+}
+
+function currentUserId(): number | undefined {
+  try {
+    const raw = window.localStorage.getItem("lm.session");
+    return raw ? (JSON.parse(raw) as { user_id?: number }).user_id : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Items queued by this account (legacy items without an owner are treated as belonging to whoever is logged in). */
+export function ownedBy(item: OutboxItem, userId: number | undefined): boolean {
+  return userId !== undefined && (item.owner_user_id === undefined || item.owner_user_id === userId);
 }
 
 export async function listOutbox(): Promise<OutboxItem[]> {
@@ -72,4 +91,12 @@ export async function loadDraft(id: string): Promise<Record<string, unknown> | u
 export async function clearDraft(id: string): Promise<void> {
   const db = await getDb();
   await db.delete("drafts", id);
+}
+
+/** Remove local form drafts (e.g. "application:") on logout so the next person on a shared phone never sees them. */
+export async function clearDraftsWithPrefix(prefix: string): Promise<void> {
+  const db = await getDb();
+  const keys = await db.getAllKeys("drafts");
+  const tx = db.transaction("drafts", "readwrite");
+  await Promise.all([...keys.filter((k) => String(k).startsWith(prefix)).map((k) => tx.store.delete(k)), tx.done]);
 }

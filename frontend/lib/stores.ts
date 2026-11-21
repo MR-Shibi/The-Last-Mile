@@ -45,3 +45,26 @@ const noopSub = () => () => undefined;
 export function useHydrated(): boolean {
   return useSyncExternalStore(noopSub, () => true, () => false);
 }
+
+// ---------------------------------------------------------------- sessionStorage (one-shot flash messages)
+function readSession(key: string): string | null {
+  try {
+    return window.sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+export function writeSessionValue(key: string, value: string | null): void {
+  try {
+    if (value === null) window.sessionStorage.removeItem(key);
+    else window.sessionStorage.setItem(key, value);
+  } catch {
+    /* storage unavailable */
+  }
+  window.dispatchEvent(new Event(STORAGE_EVENT));
+}
+
+export function useSessionValue(key: string): string | null {
+  return useSyncExternalStore(storageSub, () => readSession(key), () => null);
+}

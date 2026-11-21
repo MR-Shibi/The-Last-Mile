@@ -13,7 +13,7 @@ from app.core.consent import require_case_access
 from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.core.ratelimit import limiter
-from app.models import Case, Role, Scheme, User
+from app.models import Case, Decision, Role, Scheme, User
 
 router = APIRouter(tags=["receipts"])
 
@@ -39,7 +39,11 @@ def receipt_payload(db: Session, case: Case) -> dict:
     color, en, ur = STATUS_BADGE.get(case.status, ("blue", case.status, case.status))
     scheme = db.get(Scheme, case.scheme_id)
     d = latest_decision(db, case.id)
-    return {"case_id": case.id, "reference": f"LM-{case.tenant_id:02d}-{case.id:06d}", "pin": case.receipt_pin,
+    officer_reason = None
+    if d and str(d.get("decided_by", "")).startswith("officer:"):
+        last = db.get(Decision, d["id"])
+        officer_reason = ((last.trace_json or {}).get("reason") or None) if last else None
+    return {"officer_reason": officer_reason, "decided_by_officer": bool(d and str(d.get("decided_by", "")).startswith("officer:")),"case_id": case.id, "reference": f"LM-{case.tenant_id:02d}-{case.id:06d}", "pin": case.receipt_pin,
             "status": case.status, "color": color, "status_en": en, "status_ur": ur,
             "scheme_en": scheme.name_en if scheme else None, "scheme_ur": scheme.name_ur if scheme else None,
             "amount_pkr": scheme.amount_pkr if scheme else None,

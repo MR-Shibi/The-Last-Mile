@@ -1,6 +1,6 @@
 /** Thin API client. Security is enforced server-side; the UI only mirrors it. */
 import { useMemo } from "react";
-import { useStorageValue, writeStorage } from "@/lib/stores";
+import { useStorageValue, writeSessionValue, writeStorage } from "@/lib/stores";
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -90,8 +90,66 @@ export async function login(username: string, password: string): Promise<Session
   return s;
 }
 
-export function logout(): void {
+export const FLASH_KEY = "lm.flash";
+
+/** Clean logout: drop the tokens/role, every sessionStorage key and the local form drafts, then leave a one-shot
+ * "Logged out successfully" flash. Queued offline items stay (owner-tagged) and sync when that person logs in again. */
+export async function logout(): Promise<void> {
   setSession(null);
+  try {
+    window.sessionStorage.clear();
+  } catch {
+    /* storage unavailable */
+  }
+  try {
+    const { clearDraftsWithPrefix } = await import("@/lib/offlineDb");
+    await clearDraftsWithPrefix("application:");
+  } catch {
+    /* IndexedDB unavailable */
+  }
+  writeSessionValue(FLASH_KEY, "logged_out");
+}
+
+/** Full-page navigation on every account change. With `cacheComponents`, Next keeps recently visited routes alive in
+ * hidden <Activity> trees; a hard load guarantees no page state of the previous account (queues, forms, families)
+ * survives a logout or a new login. */
+export function hardNavigate(path: string): void {
+  window.location.assign(path);
+}
+
+export async function logoutAndGoHome(): Promise<void> {
+  await logout();
+  hardNavigate("/");
+}
+
+/** Who is logged in, for the header badge. */
+export const ROLE_LABEL: Record<Role, [string, string]> = {
+  citizen: ["Citizen", "شہری"],
+  community_helper: ["Community Helper", "کمیونٹی مددگار"],
+  department_officer: ["Department Officer", "محکمہ افسر"],
+  platform_admin: ["Platform Admin", "ایڈمن"],
+  auditor: ["Auditor", "آڈیٹر"],
+};
+
+/** Which roles may open which area (UX mirror of the server's RBAC). */
+const AREA_ROLES: [string, Role[]][] = [
+  ["/citizen", ["citizen"]],
+  ["/helper", ["community_helper"]],
+  ["/officer", ["department_officer"]],
+  ["/admin", ["platform_admin"]],
+  ["/auditor", ["auditor"]],
+];
+
+export function pathAllowed(path: string, role: Role): boolean {
+  const hit = AREA_ROLES.find(([p]) => path === p || path.startsWith(`${p}/`));
+  return !hit || hit[1].includes(role);
+}
+
+/** Where to go right after a successful login: a valid `next` for this role, else Home for citizens/helpers
+ * (where the account badge + decision pop-up appear), else the staff workspace. */
+export function afterLoginPath(role: Role, next: string | null): string {
+  if (next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/login") && pathAllowed(next, role)) return next;
+  return role === "citizen" || role === "community_helper" ? "/" : HOME_FOR_ROLE[role];
 }
 
 export const HOME_FOR_ROLE: Record<Role, string> = {

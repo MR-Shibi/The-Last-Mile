@@ -6,10 +6,11 @@ from sqlalchemy.orm import Session
 from app.core.consent import active_scopes, redact_case_data, require_case_access
 from app.core.database import get_db
 from app.core.deps import require_roles
-from app.models import Case, CaseField, ConsentScope, Decision, Role, Scheme, User
+from app.models import Case, CaseField, ConsentScope, Decision, Document, Role, Scheme, User
 
 router = APIRouter(prefix="/officer", tags=["officer"])
-OPEN_STATUSES = ("ESCALATE_HUMAN", "ASK_MORE_PROOF", "AUTO_RECOMMEND", "OFFICER_REQUESTED_PROOF")
+# SUBMITTED = saved but not yet scored (e.g. engine error) - an officer must still see it.
+OPEN_STATUSES = ("SUBMITTED", "ESCALATE_HUMAN", "ASK_MORE_PROOF", "AUTO_RECOMMEND", "OFFICER_REQUESTED_PROOF")
 
 
 def _engine_decision(db: Session, case_id: int) -> Decision | None:
@@ -60,8 +61,17 @@ def review(case_id: int, user: User = Depends(require_roles(Role.OFFICER)), db: 
                 "registry": registry.get(f) if f != "cnic" else (case.cnic if best else None)}
         present = [str(v).strip().lower() for v in vals.values() if v not in (None, "")]
         diff.append({"field": f, **vals, "mismatch": len(set(present)) > 1})
+    # Attached documents: only forensic metadata + OCR is retained (the raw image is never stored - data minimisation).
+    documents = []
+    if ConsentScope.DOCUMENTS in scopes:
+        for doc in db.execute(select(Document).where(Document.case_id == case.id).order_by(Document.id)).scalars():
+            meta = doc.meta or {}
+            documents.append({"id": doc.id, "kind": doc.kind, "sha256": doc.sha256, "ocr_confidence": doc.ocr_confidence,
+                              "quality_score": doc.quality_score, "forgery_score": doc.forgery_score,
+                              "flags": meta.get("flags", []), "ocr": meta.get("ocr", {}),
+                              "created_at": doc.created_at.isoformat() if doc.created_at else None})
     scheme = db.get(Scheme, case.scheme_id)
-    return {"case_id": case.id, "status": case.status, "scheme": scheme.name_en if scheme else None,
+    return {"case_id": case.id, "documents": documents, "documents_hidden": ConsentScope.DOCUMENTS not in scopes, "status": case.status, "scheme": scheme.name_en if scheme else None,
             "amount_pkr": scheme.amount_pkr if scheme else 0, "data": data, "diff": diff,
             "decision": {"id": d.id, "route": d.route, "probability": d.probability, "reason_user_en": d.reason_user_en,
                          "reason_user_ur": d.reason_user_ur} if d else None,

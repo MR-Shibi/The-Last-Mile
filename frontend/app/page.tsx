@@ -4,6 +4,7 @@ import Link from "next/link";
 import AppHeader from "@/components/AppHeader";
 import Icon, { type IconName } from "@/components/Icon";
 import SpeakButton from "@/components/SpeakButton";
+import { useSession } from "@/lib/api";
 import { useLang } from "@/lib/i18n";
 
 const CARDS: { href: string; icon: IconName; en: string; ur: string; sub_en: string; sub_ur: string }[] = [
@@ -15,6 +16,9 @@ const CARDS: { href: string; icon: IconName; en: string; ur: string; sub_en: str
 
 export default function Home() {
   const { lang, L } = useLang();
+  const session = useSession();
+  // A citizen/family session must not open Helper mode (it would ask for a second login inside an active session).
+  const helperLocked = session?.role === "citizen";
   return (
     <>
       <AppHeader />
@@ -36,7 +40,26 @@ export default function Home() {
         </div>
 
         <div className="mt-3 grid auto-rows-fr gap-2 sm:grid-cols-2 sm:gap-3">
-          {CARDS.map((c) => (
+          {CARDS.map((c) =>
+            helperLocked && c.href === "/helper" ? (
+              <div
+                key={c.href}
+                data-testid="home-card"
+                data-locked="true"
+                aria-disabled="true"
+                className="card flex h-full min-h-[80px] items-center gap-3 border-dashed bg-page p-3 text-slate sm:min-h-[112px] sm:gap-4 sm:p-4"
+              >
+                <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-line text-slate sm:h-14 sm:w-14" aria-hidden>
+                  <Icon name="lock" size={26} />
+                </span>
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span data-testid="card-title" className="urdu-title block text-lg leading-snug font-bold break-words sm:text-xl">{lang === "ur" ? c.ur : c.en}</span>
+                  <span data-testid="helper-locked-note" className="urdu-body block text-base leading-snug break-words">
+                    {L("Helper Mode is for registered Helpers only — Logout first to switch roles", "مددگار موڈ صرف رجسٹرڈ مددگاروں کے لیے ہے — کردار بدلنے کے لیے پہلے لاگ آؤٹ کریں")}
+                  </span>
+                </span>
+              </div>
+            ) : (
             // The speaker is a sibling of the Link (never inside it), so tapping it can never navigate.
             <div key={c.href} className="relative h-full" data-testid="home-card">
               <Link
@@ -58,7 +81,8 @@ export default function Home() {
                 className="absolute end-3 top-1/2 -translate-y-1/2 sm:end-4"
               />
             </div>
-          ))}
+            ),
+          )}
         </div>
       </div>
     </>

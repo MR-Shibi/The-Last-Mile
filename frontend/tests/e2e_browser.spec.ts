@@ -49,6 +49,20 @@ async function uiLogin(page: Page, username: string, next = "") {
   await page.getByPlaceholder("password").fill(PW);
   await page.getByRole("button", { name: /^(Login|لاگ ان)$/ }).click();
   await page.waitForURL((u) => !u.pathname.startsWith("/login"));
+  await dismissDecisions(page);
+}
+
+/** Citizens see a pop-up for each officer decision they have not acknowledged yet; acknowledge them all. */
+async function dismissDecisions(page: Page) {
+  const ok = page.getByTestId("decision-ok");
+  for (let i = 0; i < 10; i++) {
+    try {
+      await ok.waitFor({ state: "visible", timeout: i === 0 ? 2500 : 1200 });
+    } catch {
+      return;
+    }
+    await ok.click();
+  }
 }
 
 async function apiToken(request: APIRequestContext, username: string): Promise<string> {
@@ -223,7 +237,7 @@ test("2 — speaker buttons play audio without navigating", async ({ page }) => 
 });
 
 // ------------------------------------------------------------------ Test 3
-test("3 — citizen application with Muhammed spelling variant, CNIC upload and QR Parchi", async ({ page }) => {
+test("3 — citizen application with Muhammed spelling variant, CNIC upload and QR Parchi", async ({ page, request }) => {
   const w = watch(page);
   await english(page);
   await uiLogin(page, "sindh.citizen", "/citizen");
@@ -245,6 +259,34 @@ test("3 — citizen application with Muhammed spelling variant, CNIC upload and 
   await expect(parchi.getByText(/LM-\d{2}-\d{6}/)).toBeVisible();
   const pb = await box(parchi);
   expect(pb.width).toBeGreaterThan(250);
+
+  // Officer rejects it (with a written reason) -> on Home the citizen sees her account badge + the exact decision
+  const ref = (await parchi.getByText(/LM-\d{2}-\d{6}/).first().textContent())!.match(/LM-\d{2}-(\d{6})/)!;
+  const caseId = Number(ref[1]);
+  const off = await apiToken(request, "sindh.officer");
+  await apiJson(request, "POST", `/cases/${caseId}/officer-action`, off, { action: "reject", reason: "Income proof missing" });
+  await page.goto("/");
+  await expect(page.getByTestId("account-badge")).toContainText("Logged in:");
+  const decision = page.getByTestId("decision-modal");
+  await expect(decision).toBeVisible();
+  await expect(decision).toHaveAttribute("data-status", "OFFICER_REJECTED");
+  await expect(page.getByTestId("decision-text")).toHaveText(`Your application (${ref[0]}) was NOT approved. Reason: Income proof missing.`);
+  await page.getByTestId("decision-ok").click();
+  await dismissDecisions(page); // older decisions from earlier runs, if any
+  await expect(decision).toBeHidden();
+
+  // Citizen session: Helper mode is locked on Home, and /helper explains instead of opening a second login
+  await expect(page.getByTestId("helper-locked-note")).toBeVisible();
+  await page.goto("/helper");
+  await expect(page.getByTestId("role-blocked")).toBeVisible();
+  await expect(page.getByPlaceholder("username")).toHaveCount(0);
+
+  // Clean logout: confirmation banner, badge gone, Helper card active again
+  await page.getByTestId("logout-button").click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByTestId("logout-toast")).toBeVisible();
+  await expect(page.getByTestId("account-badge")).toHaveCount(0);
+  await expect(page.getByTestId("helper-locked-note")).toHaveCount(0);
   w.assertClean();
 });
 

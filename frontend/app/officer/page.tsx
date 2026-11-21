@@ -8,7 +8,9 @@ import { api, ApiError } from "@/lib/api";
 
 interface QItem { case_id: number; status: string; probability: number; flags: string[]; locked: boolean; applicant_name: string | null; reason_user_en: string | null }
 interface DiffRow { field: string; input: unknown; ocr: unknown; registry: unknown; mismatch: boolean }
+interface Doc { id: number; kind: string; sha256: string; ocr_confidence: number; quality_score: number; forgery_score: number; flags: string[]; ocr: Record<string, unknown>; created_at: string | null }
 interface Review {
+  documents?: Doc[]; documents_hidden?: boolean;
   case_id: number; status: string; scheme: string; amount_pkr: number; diff: DiffRow[]; consent_scopes: string[];
   decision: { id: number; route: string; probability: number; reason_user_en: string } | null;
   trace: { composite?: { components: Record<string, number>; min_guard_applied: boolean }; rules?: { hard: { id: string; label: string; status: string }[] };
@@ -22,9 +24,35 @@ function Workspace() {
   const [review, setReview] = useState<Review | null>(null);
   const [reason, setReason] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
+  const [showClosed, setShowClosed] = useState(false);
+  const [loadState, setLoadState] = useState<"loading" | "ready" | "error">("loading");
+  const [loadErr, setLoadErr] = useState<string | null>(null);
 
-  const load = useCallback(() => api<QItem[]>("/officer/queue").then(setQueue).catch(() => undefined), []);
-  useEffect(() => void load(), [load]);
+  // Never fail silently: a cold-starting free-tier API or a network blip used to leave an empty "Queue empty." list.
+  // Retry a few times with back-off, then show the real error with a Retry button.
+  const load = useCallback(async (closed: boolean) => {
+    setLoadState("loading");
+    let last: unknown = null;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      try {
+        const q = await api<QItem[]>(`/officer/queue${closed ? "?include_closed=true" : ""}`);
+        setQueue(q);
+        setLoadErr(null);
+        setLoadState("ready");
+        return;
+      } catch (e) {
+        last = e;
+        if (e instanceof ApiError && (e.status === 401 || e.status === 403)) break;
+        await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+      }
+    }
+    setLoadErr(last instanceof ApiError ? `${last.status}: ${last.message}` : "Network error — the server may be waking up.");
+    setLoadState("error");
+  }, []);
+  useEffect(() => {
+    const t = window.setTimeout(() => void load(showClosed), 0);
+    return () => window.clearTimeout(t);
+  }, [load, showClosed]);
 
   async function open(id: number) {
     setMsg(null);
@@ -43,7 +71,7 @@ function Workspace() {
       await api(`/cases/${review.case_id}/officer-action`, { body: { action, reason } });
       setMsg(`Recorded: ${action}`);
       await open(review.case_id);
-      await load();
+      await load(showClosed);
     } catch (e) {
       setMsg(e instanceof ApiError ? e.message : String(e));
     }
@@ -54,7 +82,7 @@ function Workspace() {
     try {
       const r = await api<{ txn_id: string }>(`/cases/${review.case_id}/disburse`, { body: {} });
       setMsg(`Paid (simulated): ${r.txn_id}`);
-      await load();
+      await load(showClosed);
     } catch (e) {
       setMsg(e instanceof ApiError ? `${e.status}: ${e.message}` : String(e));
     }
@@ -64,6 +92,23 @@ function Workspace() {
     <div className="grid gap-4 lg:grid-cols-[22rem_1fr]" dir="ltr">
       <aside className="card h-fit p-3">
         <h2 className="text-xl font-bold text-brand">Queue (lowest confidence first)</h2>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <label className="inline-flex min-h-[44px] cursor-pointer items-center gap-2 text-base font-bold">
+            <input type="checkbox" checked={showClosed} onChange={(e) => setShowClosed(e.target.checked)} className="h-5 w-5 accent-[#123C35]" />
+            Show decided cases too
+          </label>
+          <button type="button" onClick={() => void load(showClosed)} className="ml-auto inline-flex min-h-[44px] items-center gap-1 rounded-xl border-2 border-line px-3 font-bold text-brand hover:bg-tint">
+            <Icon name="sync" size={18} /> Refresh
+          </button>
+        </div>
+        <p data-testid="queue-count" className="mt-1 text-sm text-slate">{loadState === "ready" ? `${queue.length} case(s)` : loadState === "loading" ? "Loading…" : ""}</p>
+        {loadState === "error" && (
+          <div role="alert" className="panel-danger mt-2 rounded-xl p-3 text-base">
+            <p className="font-bold">Could not load the queue.</p>
+            <p className="break-words">{loadErr}</p>
+            <button type="button" onClick={() => void load(showClosed)} className="btn btn-danger mt-2 w-full">Retry</button>
+          </div>
+        )}
         <ul className="mt-2 space-y-2">
           {queue.map((q) => (
             <li key={q.case_id}>
@@ -78,7 +123,8 @@ function Workspace() {
               </button>
             </li>
           ))}
-          {!queue.length && <li className="text-slate">Queue empty.</li>}
+          {loadState === "loading" && !queue.length && <li className="text-slate">Loading cases…</li>}
+          {loadState === "ready" && !queue.length && <li className="text-slate">Queue empty — no open cases in your department.</li>}
         </ul>
       </aside>
       <section className="min-w-0">
@@ -104,6 +150,31 @@ function Workspace() {
                 </tbody>
               </table>
             </div>
+            <h3 className="mt-4 text-lg font-bold">Attached documents</h3>
+            {review.documents_hidden ? (
+              <p className="mt-1 text-base text-danger-ink">Documents consent not given — hidden.</p>
+            ) : !review.documents?.length ? (
+              <p className="mt-1 text-base text-slate">No document uploaded for this case yet.</p>
+            ) : (
+              <ul className="mt-2 space-y-2" data-testid="officer-documents">
+                {review.documents.map((d) => (
+                  <li key={d.id} className="rounded-xl border-2 border-line bg-page p-3 text-base">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="pill pill-neutral text-sm">{d.kind}</span>
+                      <span className="font-mono text-sm">sha256 {d.sha256.slice(0, 12)}…</span>
+                      <span className="text-sm text-slate">{d.created_at?.slice(0, 16).replace("T", " ")}</span>
+                    </div>
+                    <div className="mt-1 grid grid-cols-3 gap-2 text-sm">
+                      <div>OCR conf. <b className="font-mono">{d.ocr_confidence.toFixed(2)}</b></div>
+                      <div>Quality <b className="font-mono">{d.quality_score.toFixed(2)}</b></div>
+                      <div className={d.forgery_score >= 0.6 ? "text-danger-ink" : ""}>Tamper risk <b className="font-mono">{d.forgery_score.toFixed(2)}</b></div>
+                    </div>
+                    {d.flags.length > 0 && <div className="mt-1 text-sm text-danger-ink">Flags: {d.flags.join(", ")}</div>}
+                    <p className="mt-1 text-sm text-slate">Image not retained (data minimisation) — OCR values appear in the table above.</p>
+                  </li>
+                ))}
+              </ul>
+            )}
             {review.decision && (
               <div className="mt-4 rounded-xl border-2 border-line bg-page p-3">
                 <h3 className="text-lg font-bold">Rule trace — engine says {review.decision.route} (p={review.decision.probability.toFixed(3)}), rule v{review.trace.rule_version}</h3>
@@ -138,7 +209,8 @@ function Workspace() {
 export default function OfficerPage() {
   return (
     <PageShell title="Officer" width="full">
-      <RequireRole roles={["department_officer"]}>{() => <Workspace />}</RequireRole>
+      {/* keyed by account: no queue/review state can survive a logout + login as someone else */}
+      <RequireRole roles={["department_officer"]}>{(s) => <Workspace key={s.user_id} />}</RequireRole>
     </PageShell>
   );
 }

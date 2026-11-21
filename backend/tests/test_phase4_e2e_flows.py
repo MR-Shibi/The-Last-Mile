@@ -203,3 +203,21 @@ def test_frontend_production_build_has_zero_type_errors():
     assert "Type error" not in out and "Failed to compile" not in out
     for route in ("/citizen", "/helper", "/scam", "/officer", "/admin", "/auditor", "/eval"):
         assert route in out, f"route {route} missing from build output"
+
+
+def test_officer_review_lists_documents_and_receipt_carries_officer_reason(client, auth, seeded):
+    """Officer sees attached-document metadata; a rejected citizen sees the officer's exact reason."""
+    cit = auth("sindh.citizen")
+    for scope in ("identity", "income", "documents"):
+        client.post("/consents", json={"scope": scope}, headers=cit)
+    scheme_id = client.get("/schemes", headers=cit).json()[0]["id"]
+    case = client.post("/cases", json={"scheme_id": scheme_id, "data": {"full_name": "Test Person", "cnic": "4210100000001"}},
+                       headers=cit).json()
+    off = auth("sindh.officer")
+    assert any(i["case_id"] == case["id"] for i in client.get("/officer/queue", headers=off).json())
+    review = client.get(f"/officer/cases/{case['id']}/review", headers=off).json()
+    assert review["documents"] == [] and review["documents_hidden"] is False
+    r = client.post(f"/cases/{case['id']}/officer-action", json={"action": "reject", "reason": "Income above limit"}, headers=off)
+    assert r.status_code == 200
+    rc = client.get(f"/cases/{case['id']}/receipt", headers=cit).json()
+    assert rc["status"] == "OFFICER_REJECTED" and rc["officer_reason"] == "Income above limit" and rc["decided_by_officer"]

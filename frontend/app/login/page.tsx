@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import Icon, { type IconName } from "@/components/Icon";
 import { PageShell } from "@/components/ui";
-import { HOME_FOR_ROLE, login } from "@/lib/api";
+import { afterLoginPath, hardNavigate, HOME_FOR_ROLE, login, logoutAndGoHome, ROLE_LABEL, useSession } from "@/lib/api";
 import { useLang } from "@/lib/i18n";
 
 const DEMO = ["sindh.citizen", "sindh.family01", "sindh.helper", "sindh.officer", "sindh.admin", "sindh.auditor", "punjab.officer"];
@@ -21,20 +21,44 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const session = useSession();
 
   async function go(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      const s = await login(username.trim(), password);
+      const s = await login(username.trim(), password); // token + role saved → header badge updates everywhere
       const next = new URLSearchParams(window.location.search).get("next");
-      window.location.href = next && next.startsWith("/") ? next : HOME_FOR_ROLE[s.role];
+      // A `next` this role cannot open is ignored, so the user is never bounced back to this form
+      hardNavigate(afterLoginPath(s.role, next)); // full load: no hidden page state from a previous account survives
     } catch {
       setError(L("Wrong username or password", "غلط نام یا پاس ورڈ"));
-    } finally {
       setBusy(false);
     }
+  }
+
+  if (session && !busy) {
+    const mine = L(ROLE_LABEL[session.role][0], ROLE_LABEL[session.role][1]);
+    return (
+      <PageShell title={L("Login", "لاگ ان")}>
+        <div data-testid="already-logged-in" className="card mx-auto max-w-md space-y-4 p-5">
+          <h1 className="text-2xl font-bold text-brand">{L("You are already logged in", "آپ پہلے سے لاگ ان ہیں")}</h1>
+          <p className="text-lg">
+            {L("Logged in:", "لاگ ان:")} <span dir="auto" className="font-bold">{session.full_name}</span> · {mine}.{" "}
+            {L("Logout first to switch to another account or role.", "دوسرے اکاؤنٹ یا کردار کے لیے پہلے لاگ آؤٹ کریں۔")}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Link href={session.role === "citizen" || session.role === "community_helper" ? "/" : HOME_FOR_ROLE[session.role]} className="btn btn-primary">
+              <Icon name="home" size={20} /> {L("Continue", "جاری رکھیں")}
+            </Link>
+            <button type="button" className="btn btn-secondary" onClick={() => void logoutAndGoHome()}>
+              <Icon name="logout" size={20} /> {L("Logout", "لاگ آؤٹ")}
+            </button>
+          </div>
+        </div>
+      </PageShell>
+    );
   }
 
   return (
