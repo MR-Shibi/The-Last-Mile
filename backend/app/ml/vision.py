@@ -28,7 +28,7 @@ import numpy as np
 from PIL import Image
 from pydantic import BaseModel
 
-VISION_VERSION = "lastmile-vision-v4 (opencv+qr+ela+rapidocr, <=1024px)"
+VISION_VERSION = "lastmile-vision-v5 (opencv+qr+ela+rapidocr, <=1024px, low-mem det)"
 MAX_SIDE = int(os.environ.get("VISION_MAX_SIDE", "1024"))
 MAX_PIXELS_FULL_DECODE = 24_000_000  # larger files are decoded at 1/4 resolution straight away
 OCR_THREADS = int(os.environ.get("OCR_THREADS", "1"))
@@ -74,9 +74,17 @@ def _new_engine():
     except ImportError:
         from rapidocr_onnxruntime import RapidOCR  # noqa: PLC0415  (legacy 1.x package)
         return RapidOCR()
+    # Measured on a 1024px CNIC photo (peak working set during inference):
+    #   library defaults ............................................. ~459 MB peak, 1.35 s
+    #   detector long side capped at 960 + batch 1 (below) ........... ~380 MB peak, 1.10 s
+    # The default detector *upscales* the short side to >=736px (limit_type=min) and batches 6 crops.
     return RapidOCR(params={
         "Global.log_level": "warning",
         "Global.max_side_len": MAX_SIDE,
+        "Det.limit_type": "max",
+        "Det.limit_side_len": int(os.environ.get("OCR_DET_SIDE", "960")),
+        "Cls.cls_batch_num": 1,
+        "Rec.rec_batch_num": 1,
         "EngineConfig.onnxruntime.intra_op_num_threads": OCR_THREADS,
         "EngineConfig.onnxruntime.inter_op_num_threads": 1,
     })
