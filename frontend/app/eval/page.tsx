@@ -21,10 +21,10 @@ const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
 
 function Tile({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4">
-      <div className="text-sm text-gray-600">{label}</div>
-      <div className="mt-1 text-3xl font-bold tabular-nums text-gray-950">{value}</div>
-      {sub && <div className="mt-1 text-xs text-gray-600">{sub}</div>}
+    <div className="card p-4">
+      <div className="text-base text-slate">{label}</div>
+      <div className="mt-1 text-3xl font-bold tabular-nums text-ink">{value}</div>
+      {sub && <div className="mt-1 text-sm text-slate">{sub}</div>}
     </div>
   );
 }
@@ -46,11 +46,11 @@ export default function EvalDashboard() {
     <>
       <AppHeader title="Evaluation" />
       <div className="mx-auto max-w-6xl px-4 py-6" dir="ltr">
-        <h1 className="text-3xl font-bold">Evaluation dashboard</h1>
-        {err && <p className="mt-3 rounded bg-red-100 p-3">No results yet — run <code>python scripts/run_eval.py</code>. ({err})</p>}
+        <h1 className="text-3xl font-bold text-brand">Evaluation dashboard</h1>
+        {err && <p className="panel-danger mt-3 rounded-xl p-3">No results yet — run <code>python scripts/run_eval.py</code>. ({err})</p>}
         {s && (
           <>
-            <p className="mt-1 text-sm text-gray-600">
+            <p className="mt-1 text-base text-slate">
               {s.total} synthetic edge cases · 13 families · real engine + API · run {new Date(s.generated_at).toLocaleString()} ({s.runtime_seconds}s)
             </p>
             <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -61,13 +61,13 @@ export default function EvalDashboard() {
             </div>
 
             <section className="mt-8">
-              <h2 className="text-2xl font-bold">Cost-threshold optimization</h2>
-              <p className="text-sm text-gray-600">
+              <h2 className="text-2xl font-bold text-brand">Cost-threshold optimization</h2>
+              <p className="text-base text-slate">
                 Weights: wrong approval {s.cost_weights.wrong_approval} · wrong block {s.cost_weights.wrong_block} · human review {s.cost_weights.human_review} · slow proof {s.cost_weights.slow_proof}.
                 Break-even for auto vs. review: (1−p)·20 = 1 ⇒ p = 0.95.
               </p>
               <div className="mt-4 grid gap-6 lg:grid-cols-2">
-                <figure className="rounded-xl border border-gray-200 bg-[#fcfcfb] p-3">
+                <figure className="card p-3">
                   <figcaption className="font-bold">Total expected cost by AUTO threshold (lower is better)</figcaption>
                   <div className="h-72">
                     <ResponsiveContainer width="100%" height="100%">
@@ -84,7 +84,7 @@ export default function EvalDashboard() {
                     </ResponsiveContainer>
                   </div>
                 </figure>
-                <figure className="rounded-xl border border-gray-200 bg-[#fcfcfb] p-3">
+                <figure className="card p-3">
                   <figcaption className="font-bold">Outcome counts by threshold</figcaption>
                   <div className="h-72">
                     <ResponsiveContainer width="100%" height="100%">
@@ -102,19 +102,21 @@ export default function EvalDashboard() {
                   </div>
                 </figure>
               </div>
-              <table className="mt-4 w-full text-sm tabular-nums">
-                <thead><tr className="border-b text-left"><th className="p-2">Threshold</th><th>Wrong approvals</th><th>Eligible escalated</th><th>Eligible delayed by proof</th><th>Human review load</th><th>Proof requests</th><th>Total cost</th></tr></thead>
+              <div className="table-wrap mt-4">
+              <table className="text-base tabular-nums">
+                <thead><tr><th>Threshold</th><th>Wrong approvals</th><th>Eligible escalated</th><th>Eligible delayed by proof</th><th>Human review load</th><th>Proof requests</th><th>Total cost</th></tr></thead>
                 <tbody>
                   {rows.map((r) => (
-                    <tr key={r.label} className={`border-b ${r.threshold === s.optimal_threshold ? "bg-blue-50 font-bold" : ""}`}>
-                      <td className="p-2">{r.label}{r.threshold === s.optimal_threshold ? " ✔ chosen" : ""}</td><td>{r.wrong_approvals}</td><td>{r.wrongly_blocked_eligible}</td>
+                    <tr key={r.label} className={r.threshold === s.optimal_threshold ? "bg-tint font-bold" : ""}>
+                      <td>{r.label}{r.threshold === s.optimal_threshold ? " ✔ chosen" : ""}</td><td>{r.wrong_approvals}</td><td>{r.wrongly_blocked_eligible}</td>
                       <td>{r.eligible_delayed_by_proof}</td><td>{r.human_review_load}</td><td>{r.slow_proof_requests}</td>
                       <td>{r.total_expected_cost}{r.total_expected_cost === minCost ? " (min)" : ""}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              <p className="mt-2 text-sm text-gray-700">
+              </div>
+              <p className="mt-2 text-base text-slate">
                 Honest reading: in this cohort every fraud case is caught by an explicit flag, so thresholds 0.75–0.95 tie on cost and 0.98 only adds
                 proof requests for genuine applicants. 0.95 is the safest threshold among the cheapest, and the one the cost derivation predicts.
               </p>
@@ -122,7 +124,7 @@ export default function EvalDashboard() {
 
             <section className="mt-10 grid gap-6 md:grid-cols-2">
               <div>
-                <h2 className="text-2xl font-bold">Scam Shield (held-out messages)</h2>
+                <h2 className="text-2xl font-bold text-brand">Scam Shield (held-out messages)</h2>
                 <div className="mt-3 grid grid-cols-2 gap-3">
                   <Tile label="Precision (SCAM verdict)" value={pct(s.scam_metrics.precision)} />
                   <Tile label="False-alarm rate" value={pct(s.scam_metrics.false_alarm_rate)} sub="genuine notices marked SCAM" />
@@ -133,7 +135,7 @@ export default function EvalDashboard() {
                 </div>
               </div>
               <div>
-                <h2 className="text-2xl font-bold">Document forensics</h2>
+                <h2 className="text-2xl font-bold text-brand">Document forensics</h2>
                 <div className="mt-3 grid grid-cols-2 gap-3">
                   <Tile label="Precision" value={pct(s.forensics_metrics.precision)} />
                   <Tile label="Recall" value={pct(s.forensics_metrics.recall)} />
@@ -144,20 +146,22 @@ export default function EvalDashboard() {
             </section>
 
             <section className="mt-10">
-              <h2 className="text-2xl font-bold">Per-family pass rate</h2>
-              <table className="mt-3 w-full text-sm tabular-nums">
-                <thead><tr className="border-b text-left"><th className="p-2">Family</th><th>Passed</th><th>Total</th><th>Pass rate</th><th>First failures</th></tr></thead>
+              <h2 className="text-2xl font-bold text-brand">Per-family pass rate</h2>
+              <div className="table-wrap mt-3">
+              <table className="text-base tabular-nums">
+                <thead><tr><th>Family</th><th>Passed</th><th>Total</th><th>Pass rate</th><th>First failures</th></tr></thead>
                 <tbody>
                   {(fams.length ? fams : s.families.map((f) => ({ ...f, failures: [] }))).map((f) => (
-                    <tr key={f.family} className="border-b align-top">
-                      <td className="p-2 font-bold">{f.family}</td><td>{f.passed}</td><td>{f.total}</td>
-                      <td><span className={f.pass_rate === 1 ? "text-green-800" : "text-red-800"}>{f.pass_rate === 1 ? "✔ " : "✖ "}{pct(f.pass_rate)}</span></td>
-                      <td className="text-xs">{f.failures.slice(0, 2).map((x) => `${x.id}: ${x.note}`).join(" · ") || "—"}</td>
+                    <tr key={f.family}>
+                      <td className="font-bold">{f.family}</td><td>{f.passed}</td><td>{f.total}</td>
+                      <td><span className={`pill text-sm ${f.pass_rate === 1 ? "pill-safe" : "pill-danger"}`}>{f.pass_rate === 1 ? "✔ " : "✖ "}{pct(f.pass_rate)}</span></td>
+                      <td className="text-sm">{f.failures.slice(0, 2).map((x) => `${x.id}: ${x.note}`).join(" · ") || "—"}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              <ul className="mt-4 list-disc pl-5 text-sm text-gray-700">{s.notes.map((n) => <li key={n}>{n}</li>)}</ul>
+              </div>
+              <ul className="mt-4 list-disc pl-5 text-base text-slate">{s.notes.map((n) => <li key={n}>{n}</li>)}</ul>
             </section>
           </>
         )}

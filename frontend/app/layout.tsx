@@ -1,11 +1,11 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Noto_Nastaliq_Urdu } from "next/font/google";
+import { Inter, Noto_Nastaliq_Urdu } from "next/font/google";
 import "./globals.css";
 import { LanguageProvider } from "@/lib/i18n";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
-import PrototypeFooter from "@/components/PrototypeFooter";
+import SafetyBar from "@/components/SafetyBar";
 
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
+const inter = Inter({ variable: "--font-inter", subsets: ["latin"], display: "swap" });
 const nastaliq = Noto_Nastaliq_Urdu({
   variable: "--font-urdu",
   subsets: ["arabic"],
@@ -18,18 +18,18 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0b3d2e",
+  themeColor: "#123C35",
   width: "device-width",
   initialScale: 1,
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="ur" dir="rtl" suppressHydrationWarning className={`${geistSans.variable} ${nastaliq.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col" suppressHydrationWarning>
+    <html lang="ur" dir="rtl" suppressHydrationWarning className={`${inter.variable} ${nastaliq.variable} h-full antialiased`}>
+      <body className="min-h-full flex flex-col bg-page pb-8 text-ink" suppressHydrationWarning>
         <LanguageProvider>
-          <main className="flex-1 pb-32">{children}</main>
-          <PrototypeFooter />
+          <main className="flex-1">{children}</main>
+          <SafetyBar />
         </LanguageProvider>
         <ServiceWorkerRegister />
       </body>

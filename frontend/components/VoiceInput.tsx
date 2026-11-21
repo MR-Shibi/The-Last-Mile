@@ -6,6 +6,7 @@ import { useLang } from "@/lib/i18n";
 import { useDictation } from "@/lib/useDictation";
 import { parseSpokenAmountDetailed, parseSpokenCnic } from "@/lib/urduNumberParser";
 import { speak } from "@/components/SpeakButton";
+import Icon from "@/components/Icon";
 
 interface SttResult { value: string | number | null; ambiguous: boolean; confirmation_en: string; confirmation_ur: string; yes_no: string | null; transcript: string }
 
@@ -37,9 +38,9 @@ function parseLocally(field: string, transcript: string): SttResult | null {
   return null;
 }
 
-/** Mic -> continuous Web Speech transcript -> on-device number parser (server /voice/stt as fallback) ->
+/** VoiceMicButton: mic -> continuous Web Speech transcript -> on-device number parser (server /voice/stt as fallback) ->
  * mandatory read-back ("Haan Sahi Hai" / "Dobara Bolein"). Typing always works too. */
-export default function VoiceInput({ field, onConfirm }: { field: string; onConfirm: (value: string) => void }) {
+export default function VoiceInput({ field, onConfirm, label }: { field: string; onConfirm: (value: string) => void; label?: string }) {
   const { lang, L } = useLang();
   const [pending, setPending] = useState<SttResult | null>(null);
 
@@ -66,29 +67,38 @@ export default function VoiceInput({ field, onConfirm }: { field: string; onConf
   return (
     <div className="mt-3">
       {!dict.listening ? (
-        <button type="button" onClick={() => { setPending(null); dict.start(); }} className="w-full rounded-2xl border-4 border-black bg-white py-4 text-xl font-bold">
-          🎤 {L("Speak your answer", "جواب بول کر دیں")}
+        <button
+          type="button"
+          onClick={() => { setPending(null); dict.start(); }}
+          className="btn w-full border-2 border-brand bg-card text-brand hover:bg-tint"
+        >
+          <Icon name="mic" size={24} /> {label || L("Speak your answer", "جواب بول کر دیں")}
         </button>
       ) : (
-        <button type="button" onClick={dict.stop} className="w-full animate-pulse rounded-2xl border-4 border-black bg-red-200 ring-4 ring-red-600 ring-offset-2 py-4 text-xl font-bold">
-          ⏹ {L("Stop", "روکیں")}
+        <button
+          type="button"
+          onClick={dict.stop}
+          aria-pressed="true"
+          className="btn w-full animate-pulse border-2 border-danger-line bg-danger-bg text-danger-ink ring-4 ring-gold ring-offset-2"
+        >
+          <Icon name="stop" size={22} /> {L("Stop", "روکیں")}
         </button>
       )}
       {dict.listening && (
-        <p className="mt-2 min-h-12 rounded-xl bg-gray-100 p-3 text-xl" aria-live="polite">
-          {dict.finalText} <span className="text-gray-500">{dict.interim}</span>
-          {!live && <span className="text-gray-500">{L("Listening…", "سن رہی ہوں…")}</span>}
+        <p className="mt-2 min-h-12 rounded-xl border-2 border-line bg-tint p-3 text-xl" aria-live="polite">
+          {dict.finalText} <span className="text-slate">{dict.interim}</span>
+          {!live && <span className="text-slate">{L("Listening…", "سن رہی ہوں…")}</span>}
         </p>
       )}
       {dict.error && (
-        <p className="mt-2 font-bold text-danger">
+        <p className="mt-2 font-bold text-danger-ink" role="alert">
           {dict.error === "unsupported"
             ? L("Voice input is not supported on this phone. Please type.", "اس فون پر آواز سے لکھنا ممکن نہیں۔ براہ کرم ٹائپ کریں۔")
             : L("Could not hear you. Try again.", "آواز سنائی نہیں دی۔ دوبارہ کوشش کریں۔")}
         </p>
       )}
       {pending && (
-        <div className="mt-3 rounded-2xl border-4 border-human bg-blue-50 p-4" role="alertdialog">
+        <div className="panel-review mt-3 rounded-2xl p-4" role="alertdialog">
           <p className="text-xl font-bold">{lang === "ur" ? pending.confirmation_ur : pending.confirmation_en}</p>
           <div className="mt-3 grid grid-cols-2 gap-3">
             <button
@@ -98,12 +108,12 @@ export default function VoiceInput({ field, onConfirm }: { field: string; onConf
                 onConfirm(String(pending.value));
                 setPending(null);
               }}
-              className="rounded-xl bg-ok py-4 text-xl font-bold text-white disabled:opacity-40"
+              className="btn btn-primary"
             >
-              ✔ {L("Haan, Sahi Hai", "ہاں، صحیح ہے")}
+              <Icon name="check" size={22} /> {L("Haan, Sahi Hai", "ہاں، صحیح ہے")}
             </button>
-            <button type="button" onClick={() => { setPending(null); dict.start(); }} className="rounded-xl bg-warn py-4 text-xl font-bold text-white">
-              ↻ {L("Dobara Bolein", "دوبارہ بولیں")}
+            <button type="button" onClick={() => { setPending(null); dict.start(); }} className="btn btn-secondary">
+              <Icon name="mic" size={22} /> {L("Dobara Bolein", "دوبارہ بولیں")}
             </button>
           </div>
         </div>

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import AppHeader from "@/components/AppHeader";
+import Icon from "@/components/Icon";
+import { PageShell } from "@/components/ui";
 import RequireRole from "@/components/RequireRole";
 import { api, ApiError, type Consent } from "@/lib/api";
 
@@ -31,47 +32,49 @@ function Console() {
   }
 
   return (
-    <div dir="ltr" className="space-y-8">
-      <section>
-        <button onClick={() => void api<Chain>("/audit/verify-chain").then(setChain)} className="rounded-2xl bg-brand px-6 py-4 text-xl font-bold text-white">
-          🔗 Verify Hash Chain Integrity
+    <div dir="ltr" className="space-y-6">
+      <section className="card p-4">
+        <button type="button" onClick={() => void api<Chain>("/audit/verify-chain").then(setChain)} className="btn btn-primary text-xl">
+          <Icon name="link" size={22} /> Verify Hash Chain Integrity
         </button>
         {chain && (
-          <p className={`mt-3 rounded-xl p-4 text-lg font-bold text-white ${chain.valid ? "bg-ok" : "bg-danger"}`} role="status">
+          <p className={`mt-3 break-all rounded-xl p-4 text-lg font-bold ${chain.valid ? "panel-safe" : "panel-danger"}`} role="status">
             {chain.valid ? `VALID — ${chain.verified_count} entries verified · head ${chain.head_hash?.slice(0, 16)}…` : `TAMPERING DETECTED at row ${chain.broken_at}: ${chain.reason}`}
           </p>
         )}
       </section>
-      <section>
-        <h2 className="text-xl font-bold">Decision trace viewer</h2>
+      <section className="card p-4">
+        <h2 className="text-xl font-bold text-brand">Decision trace viewer</h2>
         <div className="mt-2 flex gap-2">
-          <input value={decisionId} onChange={(e) => setDecisionId(e.target.value)} placeholder="Decision ID" className="rounded-lg border-2 border-black p-2" />
-          <button onClick={() => void loadTrace()} className="rounded-lg bg-black px-4 py-2 font-bold text-white">Load</button>
+          <input value={decisionId} onChange={(e) => setDecisionId(e.target.value)} placeholder="Decision ID" className="field max-w-xs text-lg" />
+          <button type="button" onClick={() => void loadTrace()} className="btn btn-primary">Load</button>
         </div>
-        {trace !== null && <pre className="mt-2 max-h-96 overflow-auto rounded-lg bg-gray-900 p-3 text-xs text-green-200">{JSON.stringify(trace, null, 2)}</pre>}
+        {trace !== null && <pre className="mt-2 max-h-96 overflow-auto rounded-lg bg-brand-hover p-3 text-sm text-tint">{JSON.stringify(trace, null, 2)}</pre>}
       </section>
-      <section>
-        <h2 className="text-xl font-bold">Consent history timeline</h2>
-        <ol className="mt-2 max-h-72 overflow-y-auto border-l-4 border-brand pl-4 text-sm">
+      <section className="card p-4">
+        <h2 className="text-xl font-bold text-brand">Consent history timeline</h2>
+        <ol className="mt-2 max-h-72 overflow-y-auto border-l-4 border-line pl-4 text-base">
           {consents.map((c) => (
             <li key={c.id} className="mb-2">
-              <span className={`mr-2 rounded px-2 font-bold text-white ${c.active ? "bg-ok" : "bg-gray-500"}`}>{c.active ? "GRANTED" : "REVOKED"}</span>
+              <span className={`pill mr-2 text-sm ${c.active ? "pill-safe" : "pill-neutral"}`}>{c.active ? "GRANTED" : "REVOKED"}</span>
               citizen #{c.citizen_user_id} · {c.scope} · via {c.granted_via} · {new Date(c.revoked_at || c.granted_at).toLocaleString()}
             </li>
           ))}
         </ol>
       </section>
-      <section>
-        <h2 className="text-xl font-bold">Audit log</h2>
-        <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="filter action…" className="mt-2 rounded-lg border-2 border-gray-400 p-2" />
-        <table className="mt-2 w-full text-xs">
-          <thead><tr className="bg-gray-100 text-left"><th className="p-1">#</th><th>time</th><th>action</th><th>actor</th><th>resource</th><th>row_hash</th></tr></thead>
-          <tbody>
-            {logs.filter((l) => l.action.includes(filter)).map((l) => (
-              <tr key={l.id} className="border-t"><td className="p-1">{l.id}</td><td>{l.ts.slice(0, 19)}</td><td className="font-bold">{l.action}</td><td>{l.actor_role}</td><td>{l.resource_type}:{l.resource_id}</td><td className="font-mono">{l.row_hash.slice(0, 12)}</td></tr>
-            ))}
-          </tbody>
-        </table>
+      <section className="card p-4">
+        <h2 className="text-xl font-bold text-brand">Audit log</h2>
+        <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="filter action…" className="field mt-2 max-w-sm text-lg" />
+        <div className="table-wrap mt-2 max-h-[32rem] overflow-y-auto">
+          <table className="text-sm">
+            <thead><tr><th>#</th><th>time</th><th>action</th><th>actor</th><th>resource</th><th>row_hash</th></tr></thead>
+            <tbody>
+              {logs.filter((l) => l.action.includes(filter)).map((l) => (
+                <tr key={l.id}><td>{l.id}</td><td className="whitespace-nowrap">{l.ts.slice(0, 19)}</td><td className="font-bold">{l.action}</td><td>{l.actor_role}</td><td>{l.resource_type}:{l.resource_id}</td><td className="font-mono">{l.row_hash.slice(0, 12)}</td></tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
     </div>
   );
@@ -79,11 +82,8 @@ function Console() {
 
 export default function AuditorPage() {
   return (
-    <>
-      <AppHeader title="Auditor (read-only)" />
-      <div className="mx-auto max-w-5xl px-4 py-6">
-        <RequireRole roles={["auditor"]}>{() => <Console />}</RequireRole>
-      </div>
-    </>
+    <PageShell title="Auditor (read-only)" width="wide">
+      <RequireRole roles={["auditor"]}>{() => <Console />}</RequireRole>
+    </PageShell>
   );
 }

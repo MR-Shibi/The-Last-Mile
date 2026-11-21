@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { useLang, type Lang } from "@/lib/i18n";
+import Icon from "@/components/Icon";
 
 /** Text of every pre-cached prompt, so a missing/failed MP3 can still be spoken via TTS. */
 export const PROMPT_TEXT: Record<string, Record<Lang, string>> = {
@@ -89,7 +90,7 @@ export default function SpeakButton({ audioKey, text, textEn, size = "md", label
     e.preventDefault();
     e.stopPropagation();
   };
-  const cls = size === "lg" ? "h-14 w-14 text-2xl" : "h-11 w-11 text-xl";
+  const cls = size === "lg" ? "h-14 w-14" : "h-12 w-12";
   return (
     <button
       type="button"
@@ -108,9 +109,12 @@ export default function SpeakButton({ audioKey, text, textEn, size = "md", label
       }}
       aria-label={label || L("Listen", "سنیں")}
       aria-pressed={busy}
-      className={`${cls} shrink-0 rounded-full bg-yellow-300 text-black shadow ${busy ? "animate-pulse ring-4 ring-black ring-offset-2" : ""} ${className}`}
+      className={`${cls} inline-flex shrink-0 items-center justify-center rounded-full bg-gold text-ink shadow-sm hover:brightness-95 ${busy ? "animate-pulse ring-4 ring-ink ring-offset-2 ring-offset-gold/40" : ""} ${className}`}
     >
-      🔊
+      <Icon name="speaker" size={size === "lg" ? 28 : 24} strokeWidth={2.25} />
     </button>
   );
 }
+
+/** Alias: the Warm Gold audio button used next to every heading, card and instruction. */
+export const AudioButton = SpeakButton;

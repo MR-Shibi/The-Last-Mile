@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import AppHeader from "@/components/AppHeader";
+import Icon from "@/components/Icon";
+import { PageShell } from "@/components/ui";
 import RequireRole from "@/components/RequireRole";
 import { api, ApiError } from "@/lib/api";
 
@@ -14,7 +15,7 @@ interface Review {
            flags?: string[]; rule_version?: number; rule_version_id?: number; expected_costs?: Record<string, number>; inputs_hash?: string; model_version?: Record<string, string> };
 }
 
-const ROUTE_COLOR: Record<string, string> = { ESCALATE_HUMAN: "bg-human", ASK_MORE_PROOF: "bg-warn", AUTO_RECOMMEND: "bg-ok", OFFICER_REQUESTED_PROOF: "bg-warn" };
+const ROUTE_PILL: Record<string, string> = { ESCALATE_HUMAN: "pill-review", ASK_MORE_PROOF: "pill-review", AUTO_RECOMMEND: "pill-safe", OFFICER_REQUESTED_PROOF: "pill-review", OFFICER_APPROVED: "pill-safe", PAID: "pill-safe", OFFICER_REJECTED: "pill-danger" };
 
 function Workspace() {
   const [queue, setQueue] = useState<QItem[]>([]);
@@ -61,70 +62,73 @@ function Workspace() {
 
   return (
     <div className="grid gap-4 lg:grid-cols-[22rem_1fr]" dir="ltr">
-      <aside>
-        <h2 className="text-xl font-bold">Queue (lowest confidence first)</h2>
+      <aside className="card h-fit p-3">
+        <h2 className="text-xl font-bold text-brand">Queue (lowest confidence first)</h2>
         <ul className="mt-2 space-y-2">
           {queue.map((q) => (
             <li key={q.case_id}>
-              <button onClick={() => void open(q.case_id)} className={`w-full rounded-xl border-2 p-3 text-left ${review?.case_id === q.case_id ? "border-brand bg-green-50" : "border-gray-300"}`}>
+              <button onClick={() => void open(q.case_id)} className={`w-full rounded-xl border-2 p-3 text-left hover:bg-tint ${review?.case_id === q.case_id ? "border-brand bg-tint" : "border-line bg-card"}`}>
                 <div className="flex items-center gap-2">
-                  <span className={`rounded px-2 py-0.5 text-xs font-bold text-white ${ROUTE_COLOR[q.status] || "bg-gray-500"}`}>{q.status}</span>
-                  <span className="font-mono text-sm">#{q.case_id}</span>
-                  <span className="ml-auto font-mono text-sm">p={q.probability.toFixed(2)}</span>
+                  <span className={`pill text-sm ${ROUTE_PILL[q.status] || "pill-neutral"}`}>{q.status}</span>
+                  <span className="font-mono text-base font-bold">#{q.case_id}</span>
+                  <span className="ml-auto font-mono text-base">p={q.probability.toFixed(2)}</span>
                 </div>
-                <div className="mt-1 text-sm">{q.locked ? "🔒 consent missing" : q.applicant_name}</div>
-                {q.flags.length > 0 && <div className="mt-1 text-xs text-danger">{q.flags.join(" · ")}</div>}
+                <div className="mt-1 text-base">{q.locked ? "🔒 consent missing" : q.applicant_name}</div>
+                {q.flags.length > 0 && <div className="mt-1 text-sm text-danger-ink">{q.flags.join(" · ")}</div>}
               </button>
             </li>
           ))}
-          {!queue.length && <li className="text-gray-600">Queue empty.</li>}
+          {!queue.length && <li className="text-slate">Queue empty.</li>}
         </ul>
       </aside>
-      <section>
-        {msg && <p className="mb-3 rounded-lg bg-yellow-100 p-3 font-bold" role="status">{msg}</p>}
+      <section className="min-w-0">
+        {msg && <p className="panel-review mb-3 rounded-xl p-3 font-bold" role="status">{msg}</p>}
+        {!review && !msg && <p className="card p-6 text-lg text-slate">Select a case from the queue to review it.</p>}
         {review && (
-          <>
-            <h2 className="text-2xl font-bold">Case #{review.case_id} — {review.scheme} (Rs {review.amount_pkr.toLocaleString()})</h2>
-            <p className="text-sm">Consent scopes: {review.consent_scopes.join(", ")}</p>
+          <div className="card p-4">
+            <h2 className="text-2xl font-bold text-brand">Case #{review.case_id} — {review.scheme} (Rs {review.amount_pkr.toLocaleString()})</h2>
+            <p className="mt-1 flex flex-wrap items-center gap-1 text-base">Consent scopes: {review.consent_scopes.map((c) => <span key={c} className="pill pill-safe text-sm">{c}</span>)}</p>
             <h3 className="mt-4 text-lg font-bold">Input vs OCR vs Registry</h3>
-            <table className="mt-2 w-full border-collapse text-sm">
-              <thead><tr className="bg-gray-100"><th className="border p-2">Field</th><th className="border p-2">Input</th><th className="border p-2">OCR</th><th className="border p-2">Registry</th></tr></thead>
-              <tbody>
-                {review.diff.map((d) => (
-                  <tr key={d.field} className={d.mismatch ? "bg-red-50" : ""}>
-                    <td className="border p-2 font-bold">{d.field}{d.mismatch ? " ⚠" : ""}</td>
-                    <td className="border p-2">{String(d.input ?? "—")}</td>
-                    <td className="border p-2">{String(d.ocr ?? "—")}</td>
-                    <td className="border p-2">{String(d.registry ?? "—")}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="table-wrap mt-2">
+              <table className="text-base">
+                <thead><tr><th>Field</th><th>Input</th><th>OCR</th><th>Registry</th></tr></thead>
+                <tbody>
+                  {review.diff.map((d) => (
+                    <tr key={d.field} className={d.mismatch ? "bg-danger-bg" : ""}>
+                      <td className="font-bold">{d.field}{d.mismatch && <span className="pill pill-danger ml-2 text-sm">mismatch</span>}</td>
+                      <td>{String(d.input ?? "—")}</td>
+                      <td>{String(d.ocr ?? "—")}</td>
+                      <td>{String(d.registry ?? "—")}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
             {review.decision && (
-              <div className="mt-4 rounded-xl border-2 border-gray-300 p-3">
+              <div className="mt-4 rounded-xl border-2 border-line bg-page p-3">
                 <h3 className="text-lg font-bold">Rule trace — engine says {review.decision.route} (p={review.decision.probability.toFixed(3)}), rule v{review.trace.rule_version}</h3>
-                <p className="text-sm">{review.decision.reason_user_en}</p>
+                <p className="text-base">{review.decision.reason_user_en}</p>
                 <div className="mt-2 grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
                   {Object.entries(review.trace.composite?.components || {}).map(([k, v]) => (
-                    <div key={k} className="rounded bg-gray-100 p-2"><div className="text-xs">{k}</div><div className="font-mono text-lg">{v.toFixed(3)}</div></div>
+                    <div key={k} className="rounded-lg border border-line bg-card p-2"><div className="text-sm text-slate">{k}</div><div className="font-mono text-lg">{v.toFixed(3)}</div></div>
                   ))}
                 </div>
-                {review.trace.composite?.min_guard_applied && <p className="mt-1 text-sm font-bold text-danger">Min-guard applied: one weak sub-score capped p.</p>}
-                <ul className="mt-2 text-sm">
+                {review.trace.composite?.min_guard_applied && <p className="mt-1 text-base font-bold text-danger-ink">Min-guard applied: one weak sub-score capped p.</p>}
+                <ul className="mt-2 text-base">
                   {review.trace.rules?.hard.map((r) => <li key={r.id}>{r.status === "pass" ? "✔" : r.status === "fail" ? "✖" : "?"} {r.label}</li>)}
                 </ul>
-                {!!review.trace.flags?.length && <p className="mt-1 text-sm text-danger">Flags: {review.trace.flags.join(", ")}</p>}
-                <p className="mt-1 font-mono text-xs">inputs_hash {review.trace.inputs_hash?.slice(0, 16)}… · {JSON.stringify(review.trace.expected_costs)}</p>
+                {!!review.trace.flags?.length && <p className="mt-1 text-base text-danger-ink">Flags: {review.trace.flags.join(", ")}</p>}
+                <p className="mt-1 break-all font-mono text-sm text-slate">inputs_hash {review.trace.inputs_hash?.slice(0, 16)}… · {JSON.stringify(review.trace.expected_costs)}</p>
               </div>
             )}
-            <textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason (mandatory for Request Proof / Reject)" className="mt-4 w-full rounded-xl border-2 border-black p-3" rows={2} />
+            <textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason (mandatory for Request Proof / Reject)" className="field mt-4 text-lg" rows={2} />
             <div className="mt-2 flex flex-wrap gap-2">
-              <button onClick={() => void act("approve")} className="rounded-xl bg-ok px-5 py-3 font-bold text-white">Approve</button>
-              <button onClick={() => void act("request_proof")} className="rounded-xl bg-warn px-5 py-3 font-bold text-white">Request proof</button>
-              <button onClick={() => void act("reject")} disabled={reason.trim().length < 5} className="rounded-xl bg-danger px-5 py-3 font-bold text-white disabled:opacity-40">Reject</button>
-              <button onClick={() => void disburse()} className="ml-auto rounded-xl bg-black px-5 py-3 font-bold text-white">💸 1-tap disburse</button>
+              <button type="button" onClick={() => void act("approve")} className="btn btn-primary"><Icon name="check" size={20} /> Approve</button>
+              <button type="button" onClick={() => void act("request_proof")} className="btn panel-review">Request proof</button>
+              <button type="button" onClick={() => void act("reject")} disabled={reason.trim().length < 5} className="btn btn-danger">Reject</button>
+              <button type="button" onClick={() => void disburse()} className="btn btn-gold ml-auto">1-tap disburse (simulated)</button>
             </div>
-          </>
+          </div>
         )}
       </section>
     </div>
@@ -133,11 +137,8 @@ function Workspace() {
 
 export default function OfficerPage() {
   return (
-    <>
-      <AppHeader title="Officer" />
-      <div className="mx-auto max-w-6xl px-4 py-6">
-        <RequireRole roles={["department_officer"]}>{() => <Workspace />}</RequireRole>
-      </div>
-    </>
+    <PageShell title="Officer" width="full">
+      <RequireRole roles={["department_officer"]}>{() => <Workspace />}</RequireRole>
+    </PageShell>
   );
 }

@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import AppHeader from "@/components/AppHeader";
+import Icon from "@/components/Icon";
+import { PageShell } from "@/components/ui";
 import RequireRole from "@/components/RequireRole";
 import { api, ApiError, type Scheme } from "@/lib/api";
 
@@ -76,59 +77,77 @@ function Console() {
   }
 
   return (
-    <div dir="ltr" className="space-y-8">
-      {msg && <p className="rounded-lg bg-yellow-100 p-3 font-bold" role="status">{msg}</p>}
-      <section>
-        <h2 className="text-2xl font-bold">Live fault injection</h2>
+    <div dir="ltr" className="space-y-6">
+      {msg && <p className="panel-review rounded-xl p-3 font-bold" role="status">{msg}</p>}
+      <section className="card p-4">
+        <h2 className="text-2xl font-bold text-brand">Live fault injection</h2>
+        <p className="text-base text-slate">Simulate a failing government rail. Applicants are routed to a human, never auto-rejected.</p>
         <div className="mt-3 flex flex-wrap gap-3">
           {faults && (Object.keys(FAULT_LABEL) as (keyof Faults)[]).map((k) => (
             <button key={k} role="switch" aria-checked={faults[k]} onClick={() => void toggleFault(k)}
-              className={`rounded-2xl border-4 px-5 py-3 text-lg font-bold ${faults[k] ? "border-danger bg-danger text-white" : "border-gray-400 bg-white"}`}>
-              {faults[k] ? "⚡ ON" : "OFF"} · {FAULT_LABEL[k]}
+              className={`inline-flex min-h-[56px] items-center gap-3 rounded-2xl border-2 px-4 text-lg font-bold ${faults[k] ? "border-danger-line bg-danger-bg text-danger-ink" : "border-line bg-card text-ink hover:bg-tint"}`}>
+              <span className={`relative h-7 w-12 rounded-full transition ${faults[k] ? "bg-danger-ink" : "bg-[#c9d1cc]"}`} aria-hidden>
+                <span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all ${faults[k] ? "left-6" : "left-1"}`} />
+              </span>
+              {faults[k] ? "ON" : "OFF"} · {FAULT_LABEL[k]}
             </button>
           ))}
         </div>
       </section>
 
-      <section>
-        <h2 className="text-2xl font-bold">No-code rule editor</h2>
-        <select value={schemeId ?? ""} onChange={(e) => { setSchemeId(Number(e.target.value)); void loadRules(Number(e.target.value)); }} className="mt-2 rounded-lg border-2 border-black p-2">
+      <section className="card p-4">
+        <h2 className="text-2xl font-bold text-brand">No-code rule editor</h2>
+        <select value={schemeId ?? ""} onChange={(e) => { setSchemeId(Number(e.target.value)); void loadRules(Number(e.target.value)); }} className="field mt-2 max-w-md text-lg">
           {schemes.map((s) => <option key={s.id} value={s.id}>{s.name_en}</option>)}
         </select>
-        <textarea value={editor} onChange={(e) => setEditor(e.target.value)} rows={18} spellCheck={false} className="mt-3 w-full rounded-xl border-2 border-black p-3 font-mono text-sm" />
-        <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Change notes" className="mt-2 w-full rounded-lg border-2 border-gray-400 p-2" />
-        <div className="mt-3 flex gap-3">
-          <button onClick={() => void simulate()} className="rounded-xl bg-human px-5 py-3 font-bold text-white">🔮 Run Digital Twin</button>
-          <button onClick={() => void publish()} className="rounded-xl bg-brand px-5 py-3 font-bold text-white">Publish new version</button>
+        <textarea value={editor} onChange={(e) => setEditor(e.target.value)} rows={18} spellCheck={false} className="field mt-3 font-mono text-sm" />
+        <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Change notes" className="field mt-2 text-lg" />
+        <div className="mt-3 flex flex-wrap gap-3">
+          <button type="button" onClick={() => void simulate()} className="btn btn-gold"><Icon name="layers" size={20} /> Run Digital Twin</button>
+          <button type="button" onClick={() => void publish()} className="btn btn-primary">Publish new version</button>
         </div>
-        <h3 className="mt-4 font-bold">Version history</h3>
-        <ul className="text-sm">
-          {versions.map((v) => <li key={v.id}>v{v.version} {v.is_active ? "(active)" : ""} — {v.notes} · {new Date(v.created_at).toLocaleString()}</li>)}
-        </ul>
+        <h3 className="mt-5 text-lg font-bold">Version history</h3>
+        <div className="table-wrap mt-2">
+          <table className="text-base">
+            <thead><tr><th>Version</th><th>Status</th><th>Notes</th><th>Created</th></tr></thead>
+            <tbody>
+              {versions.map((v) => (
+                <tr key={v.id}>
+                  <td className="font-mono font-bold">v{v.version}</td>
+                  <td>{v.is_active ? <span className="pill pill-safe text-sm">active</span> : <span className="pill pill-neutral text-sm">archived</span>}</td>
+                  <td>{v.notes}</td>
+                  <td className="whitespace-nowrap text-slate">{new Date(v.created_at).toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       {sim && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true">
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6">
-            <h2 className="text-2xl font-bold">Digital Twin — projected impact</h2>
-            <p className="text-sm">{sim.total_cases} cases replayed ({sim.real_cases} real, {sim.synthetic_cases} synthetic). Nothing was written.</p>
-            <table className="mt-4 w-full text-center text-lg">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-ink/60 p-4" role="dialog" aria-modal="true" aria-labelledby="twin-title">
+          <div className="card max-h-[90vh] w-full max-w-2xl overflow-y-auto p-6">
+            <h2 id="twin-title" className="text-2xl font-bold text-brand">Digital Twin — projected impact</h2>
+            <p className="text-base text-slate">{sim.total_cases} cases replayed ({sim.real_cases} real, {sim.synthetic_cases} synthetic). Nothing was written.</p>
+            <div className="table-wrap mt-4">
+            <table className="text-center text-lg">
               <thead><tr><th /><th>Baseline</th><th>Projected</th><th>Δ</th></tr></thead>
               <tbody>
                 {([["Auto-recommend", "approved"], ["Ask more proof", "ask"], ["Escalate to human", "escalated"]] as const).map(([label, k]) => {
                   const b = sim[`baseline_${k}` as keyof Sim] as number;
                   const p = sim[`projected_${k}` as keyof Sim] as number;
-                  return <tr key={k} className="border-t"><td className="text-left font-bold">{label}</td><td>{b}</td><td>{p}</td><td className={p - b > 0 ? "text-ok" : p - b < 0 ? "text-danger" : ""}>{p - b > 0 ? "+" : ""}{p - b}</td></tr>;
+                  return <tr key={k}><td className="text-left font-bold">{label}</td><td>{b}</td><td>{p}</td><td className={`font-bold ${p - b > 0 ? "text-brand" : p - b < 0 ? "text-danger-ink" : ""}`}>{p - b > 0 ? "+" : ""}{p - b}</td></tr>;
                 })}
               </tbody>
             </table>
-            <h3 className="mt-4 font-bold">{sim.changed_case_ids.length} cases change route</h3>
-            <ul className="max-h-48 overflow-y-auto font-mono text-xs">
+            </div>
+            <h3 className="mt-4 text-lg font-bold">{sim.changed_case_ids.length} cases change route</h3>
+            <ul className="max-h-48 overflow-y-auto rounded-lg border border-line bg-page p-2 font-mono text-sm">
               {sim.changes.map((c) => <li key={String(c.case_id)}>{String(c.case_id)}: {c.from} → {c.to}</li>)}
             </ul>
             <div className="mt-4 flex gap-3">
-              <button onClick={() => void publish()} className="rounded-xl bg-brand px-5 py-3 font-bold text-white">Publish</button>
-              <button onClick={() => setSim(null)} className="rounded-xl border-2 border-black px-5 py-3 font-bold">Close</button>
+              <button type="button" onClick={() => void publish()} className="btn btn-primary">Publish</button>
+              <button type="button" onClick={() => setSim(null)} className="btn btn-secondary">Close</button>
             </div>
           </div>
         </div>
@@ -139,11 +158,8 @@ function Console() {
 
 export default function AdminPage() {
   return (
-    <>
-      <AppHeader title="Admin" />
-      <div className="mx-auto max-w-4xl px-4 py-6">
-        <RequireRole roles={["platform_admin"]}>{() => <Console />}</RequireRole>
-      </div>
-    </>
+    <PageShell title="Admin" width="wide">
+      <RequireRole roles={["platform_admin"]}>{() => <Console />}</RequireRole>
+    </PageShell>
   );
 }

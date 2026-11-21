@@ -96,8 +96,21 @@ async function nextQ(page: Page) {
   await page.getByRole("button", { name: /Next/ }).click();
 }
 
-/** Consent screen -> all questions. Returns once the CNIC photo step is visible. */
-async function fillApplication(page: Page, a: { full_name: string; father: string; cnic: string; age: number; income: number }, grant = true) {
+/** 4-step form: Step 1 (consent + name/details) -> Step 2 (CNIC via keypad + income) -> Step 3 photo.
+ * `showAll` exercises the "Show All Fields" mode (every step on one page, no step navigation). */
+async function fillApplication(
+  page: Page,
+  a: { full_name: string; father: string; cnic: string; age: number; income: number | string },
+  opts: { grant?: boolean; showAll?: boolean } = {},
+) {
+  const { grant = true, showAll = false } = opts;
+  if (showAll) {
+    await page.getByTestId("show-all-toggle").click();
+    await expect(page.getByTestId("show-all-toggle")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("button", { name: /Next/ })).toHaveCount(0); // no step blocking
+  } else {
+    await expect(page.getByTestId("step-tab-1")).toHaveAttribute("aria-current", "step");
+  }
   if (grant) {
     await expect(page.getByRole("heading", { name: "Who can see your information?" })).toBeVisible();
     for (const label of ["Officer may see my name and CNIC", "Officer may see my income", "Officer may see my CNIC photo"]) {
@@ -106,32 +119,38 @@ async function fillApplication(page: Page, a: { full_name: string; father: strin
       await sw.click();
       await expect(sw).toHaveAttribute("aria-checked", "true");
     }
-    await nextQ(page);
   }
-  const input = page.locator("form input");
-  for (const v of [a.full_name, a.father]) {
-    await input.fill(v);
+  await page.getByTestId("field-full_name").fill(a.full_name);
+  await page.getByTestId("field-father_name").fill(a.father);
+  await page.getByTestId("field-age").fill(String(a.age));
+  await page.getByTestId("choice-province-Sindh").click();
+  await page.getByTestId("choice-is_widow-yes").click();
+  if (!showAll) {
     await nextQ(page);
+    await expect(page.getByTestId("step-tab-2")).toHaveAttribute("aria-current", "step");
   }
   // CNIC via the large on-screen keypad (noisy-room backup): digits auto-format as XXXXX-XXXXXXX-X
+  const cnicInput = page.getByTestId("field-cnic");
   await page.getByTestId("keypad-clear").click();
   const cnicDigits = a.cnic.replace(/\D/g, "");
   for (const d of cnicDigits.slice(0, 12)) await page.getByTestId(`keypad-${d}`).click();
   await page.getByTestId("keypad-9").click();    // a slip of the finger...
   await page.getByTestId("keypad-back").click(); // ...corrected with backspace
   await page.getByTestId(`keypad-${cnicDigits[12]}`).click();
-  await expect(input).toHaveValue(a.cnic);
-  await nextQ(page);
-  await input.fill(String(a.age));
-  await nextQ(page);
-  await page.getByRole("button", { name: "Sindh" }).click();
-  await page.getByRole("button", { name: /Yes/ }).click(); // widow
-  await input.fill(String(a.income));
-  await nextQ(page);
-  await input.fill("2");
-  await nextQ(page);
-  await page.getByRole("button", { name: /No/ }).click(); // no other grant
+  await expect(cnicInput).toHaveValue(a.cnic);
+  await page.getByTestId("field-monthly_income").fill(String(a.income));
+  await page.getByTestId("field-dependents").fill("2");
+  await page.getByTestId("choice-receives_other_grant-no").click();
+  if (!showAll) await nextQ(page);
   await expect(page.getByRole("heading", { name: "Take a photo of your CNIC" })).toBeVisible();
+}
+
+/** Step 3 -> Step 4 (review) and submit. */
+async function reviewAndSubmit(page: Page, cnic: string) {
+  await nextQ(page);
+  await expect(page.getByRole("heading", { name: "Review & Submit" })).toBeVisible();
+  await expect(page.getByText(cnic, { exact: true })).toBeVisible(); // read-only summary before submitting
+  await page.getByRole("button", { name: "Submit application" }).click();
 }
 
 async function openScheme(page: Page, name = "Widow Relief Grant") {
@@ -149,7 +168,7 @@ test("1 — zero console/network errors and Urdu RTL layout without overlaps", a
   await page.getByRole("button", { name: "اردو" }).click();
   await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
   await expect(page.locator("html")).toHaveAttribute("lang", "ur");
-  await expect(page.getByTestId("card-title").first()).toHaveText("امداد کے لیے درخواست");
+  await expect(page.getByTestId("card-title").first()).toHaveText("امداد کے لیے درخواست دیں");
   await assertCardsDoNotOverlap(page);
 
   // Urdu headings/body really get the taller Nastaliq leading
@@ -216,7 +235,7 @@ test("3 — citizen application with Muhammed spelling variant, CNIC upload and 
   await expect(page.getByText("Please retake the photo")).toBeVisible();
   await page.locator('input[type="file"]').setInputFiles(path.join(FIX, "cnic_clean.png"));
   await expect(page.getByText("Photo looks clear")).toBeVisible();
-  await page.getByRole("button", { name: "Submit application" }).click();
+  await reviewAndSubmit(page, applicant.cnic);
 
   const parchi = page.getByTestId("parchi");
   await expect(parchi).toBeVisible();
@@ -237,14 +256,16 @@ test("4 — offline outbox queues the application and syncs once without duplica
   await english(page);
   await uiLogin(page, user, "/citizen");
   await openScheme(page);
-  await fillApplication(page, { full_name: name, father: "Muhammed Ali", cnic: "42101-1111111-1", age: 40, income: 9000 });
+  await fillApplication(page, { full_name: name, father: "Muhammed Ali", cnic: "42101-1111111-1", age: 40, income: "nau hazar" }, { showAll: true });
+  await expect(page.getByText("= Rs 9,000")).toBeVisible(); // colloquial words parsed on-device
 
   await context.setOffline(true);
   await page.getByRole("button", { name: "Submit application" }).click();
   await expect(page.getByRole("heading", { name: "Saved on this phone" })).toBeVisible();
   const eventId = (await page.locator("p.font-mono").innerText()).trim();
   expect(eventId.length).toBeGreaterThan(8);
-  await expect(page.getByTestId("outbox-badge")).toContainText("1");
+  // 3 consent grants + 1 application, all queued with idempotency keys (consent is recorded at submit time)
+  await expect(page.getByTestId("outbox-badge")).toContainText("4");
   await expect(page.getByRole("status").filter({ hasText: "Offline" })).toBeVisible();
 
   await context.setOffline(false); // 'online' event -> automatic /sync
@@ -292,15 +313,15 @@ test("5 — helper mode switches families with PINs, updates banner and clears i
     await expect(banner).toContainText("consent");
     await expect(banner).not.toContainText("no consent");
     await page.getByRole("button", { name: "Widow Relief Grant" }).click();
-    await expect(page.locator("form input")).toBeVisible();
+    await expect(page.getByTestId("field-full_name")).toBeVisible();
   }
 
   await openFamily(0);
-  await page.locator("form input").fill("Typed for family one");
+  await page.getByTestId("field-full_name").fill("Typed for family one");
   await page.getByRole("button", { name: /Switch/ }).click();
   await openFamily(1);
   await expect(banner).not.toContainText(names[0]);
-  await expect(page.locator("form input")).toHaveValue(""); // previous family's input is gone
+  await expect(page.getByTestId("field-full_name")).toHaveValue(""); // previous family's input is gone
   w.assertClean();
 });
 
@@ -460,7 +481,7 @@ test("8 — a 4000px phone photo is shrunk on-device (<=1024px JPEG) and real OC
   await expect(page.getByText("Photo looks clear")).toBeVisible({ timeout: 180_000 });
   const checkMs = Date.now() - t0;
   const t1 = Date.now();
-  await page.getByRole("button", { name: "Submit application" }).click();
+  await reviewAndSubmit(page, applicant.cnic);
   await expect(page.getByTestId("parchi")).toBeVisible({ timeout: 180_000 });
   await expect(page.getByTestId("parchi-badge")).toHaveAttribute("data-color", "green");
   console.log(`[timing] uploaded ${Math.round(info.size / 1000)} KB (${info.width}x${info.height}) from ${Math.round(original / 1000)} KB; photo check ${checkMs} ms; submit ${Date.now() - t1} ms`);
