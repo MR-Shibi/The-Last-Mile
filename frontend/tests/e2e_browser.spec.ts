@@ -391,3 +391,48 @@ test("7 — officer queue, consent take-back, admin Digital Twin + faults, audit
   wd.assertClean();
   await aud.ctx.close();
 });
+
+// ------------------------------------------------------------------ Test 8
+test("8 — a 4000px phone photo is shrunk on-device (<=1024px JPEG) and real OCR clears it", async ({ page }) => {
+  const w = watch(page);
+  // Record every File the page uploads (Playwright cannot read multipart file bodies from Chromium).
+  await page.addInitScript(() => {
+    const orig = window.fetch.bind(window);
+    window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.body instanceof FormData) {
+        for (const v of init.body.values()) if (v instanceof File) (window as unknown as { __uploads: File[] }).__uploads = [...((window as unknown as { __uploads?: File[] }).__uploads || []), v];
+      }
+      return orig(input, init);
+    };
+  });
+  await english(page);
+  await uiLogin(page, "sindh.citizen", "/citizen");
+  await openScheme(page);
+  await fillApplication(page, { full_name: applicant.full_name, father: applicant.father_name_variant, cnic: applicant.cnic, age: applicant.age, income: 15000 });
+
+  const original = fs.statSync(path.join(FIX, "cnic_phone.jpg")).size;
+  const t0 = Date.now();
+  await page.locator('input[type="file"]').setInputFiles(path.join(FIX, "cnic_phone.jpg"));
+  await expect(page.getByTestId("shrink-info")).toContainText("→");
+  const up = await page.waitForFunction(async () => {
+    const files = (window as unknown as { __uploads?: File[] }).__uploads || [];
+    const f = files[files.length - 1];
+    if (!f) return null;
+    const bmp = await createImageBitmap(f);
+    return { type: f.type, size: f.size, width: bmp.width, height: bmp.height };
+  });
+  const info = (await up.jsonValue())!;
+  expect(info.type).toBe("image/jpeg");
+  expect(info.size, "upload must be much smaller than the 1.2 MB original").toBeLessThan(original / 3);
+  expect(Math.max(info.width, info.height)).toBeLessThanOrEqual(1024);
+
+  // Real OCR (re-encoding drops any fixture text) must succeed on the server
+  await expect(page.getByText("Photo looks clear")).toBeVisible({ timeout: 180_000 });
+  const checkMs = Date.now() - t0;
+  const t1 = Date.now();
+  await page.getByRole("button", { name: "Submit application" }).click();
+  await expect(page.getByTestId("parchi")).toBeVisible({ timeout: 180_000 });
+  await expect(page.getByTestId("parchi-badge")).toHaveAttribute("data-color", "green");
+  console.log(`[timing] uploaded ${Math.round(info.size / 1000)} KB (${info.width}x${info.height}) from ${Math.round(original / 1000)} KB; photo check ${checkMs} ms; submit ${Date.now() - t1} ms`);
+  w.assertClean();
+});

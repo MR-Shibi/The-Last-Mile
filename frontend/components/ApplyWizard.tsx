@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { api, ApiError, type Receipt, type Scheme } from "@/lib/api";
 import { useLang } from "@/lib/i18n";
+import { formatBytes, shrinkForUpload } from "@/lib/image";
 import { enqueue, newClientEventId, saveDraft } from "@/lib/offlineDb";
 import ConsentPanel from "@/components/ConsentPanel";
 import Parchi from "@/components/Parchi";
@@ -35,6 +36,8 @@ export default function ApplyWizard({ scheme, citizenUserId, onCancel }: { schem
   const [draft, setDraftVal] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
   const [vision, setVision] = useState<VisionResult | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [shrinkInfo, setShrinkInfo] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
@@ -66,19 +69,25 @@ export default function ApplyWizard({ scheme, citizenUserId, onCancel }: { schem
     void saveDraft(`application:${citizenUserId ?? "self"}`, next).catch(() => undefined);
   }
 
-  async function checkPhoto(f: File) {
-    setPhoto(f);
+  async function checkPhoto(original: File) {
     setVision(null);
-    if (!navigator.onLine) return;
-    const form = new FormData();
-    form.append("file", f);
+    setChecking(true);
     try {
+      // Shrink on the phone first (<=1024px JPEG): fast on 2G and light on the free-tier server.
+      const s = await shrinkForUpload(original);
+      setPhoto(s.file);
+      setShrinkInfo(s.resized ? `${formatBytes(s.originalBytes)} → ${formatBytes(s.finalBytes)}` : null);
+      if (!navigator.onLine) return;
+      const form = new FormData();
+      form.append("file", s.file);
       const qs = data.cnic ? `?cnic=${encodeURIComponent(String(data.cnic))}` : "";
       const v = await api<VisionResult>(`/vision/check${qs}`, { form });
       setVision(v);
       if (!v.ok_to_submit) void speak({ audioKey: "retake_photo", lang });
     } catch {
       /* the server re-checks on submit anyway */
+    } finally {
+      setChecking(false);
     }
   }
 
@@ -217,9 +226,19 @@ export default function ApplyWizard({ scheme, citizenUserId, onCancel }: { schem
             {!vision.retake_tips.length && <p className="mt-1">{vision.flags.join(", ")}</p>}
           </div>
         )}
+        {shrinkInfo && (
+          <p data-testid="shrink-info" className="mt-3 text-base text-gray-700">
+            📉 {L("Photo compressed on your phone", "تصویر فون پر ہی چھوٹی کر دی گئی")}: <span dir="ltr">{shrinkInfo}</span>
+          </p>
+        )}
+        {checking && (
+          <p className="mt-3 animate-pulse rounded-xl bg-blue-50 p-3 text-lg font-bold" role="status">
+            ⏳ {L("Checking your photo…", "آپ کی تصویر جانچی جا رہی ہے…")}
+          </p>
+        )}
         {vision?.ok_to_submit && <p className="mt-4 rounded-xl bg-green-100 p-3 text-xl font-bold text-green-900">✔ {L("Photo looks clear", "تصویر صاف ہے")}</p>}
         {error && <p className="mt-3 font-bold text-danger" role="alert">{error}</p>}
-        <button disabled={busy} onClick={() => void submit()} className="mt-5 w-full rounded-2xl bg-brand py-5 text-2xl font-bold text-white disabled:opacity-50">
+        <button disabled={busy || checking} onClick={() => void submit()} className="mt-5 w-full rounded-2xl bg-brand py-5 text-2xl font-bold text-white disabled:opacity-50">
           {busy ? "…" : L("Submit application", "درخواست جمع کریں")}
         </button>
         <button onClick={() => setStep(N)} className="mt-4 underline">← {L("Back", "پیچھے")}</button>

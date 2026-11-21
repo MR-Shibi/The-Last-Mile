@@ -99,6 +99,16 @@ Every test fails on any uncaught page error, `console.error` or unexpected API 4
 
 Backend environment variables: `DATABASE_URL` (provider URL as-is), `JWT_SECRET` (long random), `FRONTEND_URL` (comma-separated deployed origins, e.g. `https://last-mile.vercel.app`), optional `CORS_ORIGIN_REGEX` (e.g. `https://.*\.vercel\.app` for preview deployments). `http://localhost:3000` and `http://127.0.0.1:3000` are always allowed. The image bundles the Urdu/English prompt MP3s and pre-downloads the RapidOCR models, so neither needs network at runtime.
 
+**Free-tier image pipeline (512 MB RAM, fractional CPU).** The PWA resizes phone photos on a `<canvas>` to at most 1024 px and re-encodes them as JPEG (quality 0.82) before upload. A 4000-px, 1.2 MB photo becomes about 50 KB, which suits 2G. Small images are sent untouched so forensic metadata survives.
+
+The backend has four safeguards:
+- It downscales anything above 1024 px before OpenCV or RapidOCR runs, and decodes very large files at reduced resolution.
+- It keeps one RapidOCR instance that runs one inference at a time on one thread (`OCR_THREADS`), and calls `gc.collect()` afterwards.
+- It caches each image's analysis by hash, so the photo check and the submit upload don't OCR the same photo twice.
+- Any memory or engine error becomes a `vision_engine_failure` flag, which routes the case to `ESCALATE_HUMAN` ("I am not sure") instead of crashing.
+
+**Verify a deployment:** `python backend/scripts/verify_demo_script.py --base https://<api>` and `cd frontend && E2E_BASE_URL=https://<web> E2E_API_URL=https://<api> npx playwright test`. Both drive the live services and write synthetic data.
+
 ## Test credentials
 
 Password for every synthetic account: **`Demo@1234`**

@@ -8,8 +8,15 @@ Checks (all real computer vision on the uploaded pixels):
                  editing-software metadata (EXIF/PNG Software tag) and an Error-Level-Analysis heuristic
   * OCR        - RapidOCR (ONNX, no system binary) -> structured Pydantic extraction.
                  Test fixtures may embed deterministic OCR output (PNG `lastmile_fixture` chunk).
+
+Memory/CPU safety for small hosts (e.g. a 512 MB free-tier container): images are downscaled to
+MAX_SIDE before any processing (huge files are decoded at reduced resolution), one RapidOCR singleton
+runs one inference at a time on OCR_THREADS threads, gc runs after inference, results are cached per
+image hash, and any engine failure becomes a `vision_engine_failure` flag (-> ESCALATE_HUMAN), never a crash.
 """
+import gc
 import hashlib
+from collections import OrderedDict
 import io
 import json
 import os
@@ -21,7 +28,11 @@ import numpy as np
 from PIL import Image
 from pydantic import BaseModel
 
-VISION_VERSION = "lastmile-vision-v3 (opencv+qr+ela+rapidocr)"
+VISION_VERSION = "lastmile-vision-v4 (opencv+qr+ela+rapidocr, <=1024px)"
+MAX_SIDE = int(os.environ.get("VISION_MAX_SIDE", "1024"))
+MAX_PIXELS_FULL_DECODE = 24_000_000  # larger files are decoded at 1/4 resolution straight away
+OCR_THREADS = int(os.environ.get("OCR_THREADS", "1"))
+_CACHE_SIZE = 32
 BLUR_VAR_MIN = 120.0     # Laplacian variance below this = blurry
 DARK_MEAN_MAX = 70.0     # mean grey below this = too dark
 GLARE_RATIO_MAX = 0.35   # fraction of near-white (>=250) pixels above this = glare
@@ -51,28 +62,56 @@ class CnicExtraction(BaseModel):
     engine: str = "none"
 
 
-_ocr_lock = threading.Lock()
+_ocr_lock = threading.Lock()   # one engine, one inference at a time (bounded RAM)
 _ocr_engine = None
+_cache_lock = threading.Lock()
+_cache: "OrderedDict[str, dict]" = OrderedDict()
+
+
+def _new_engine():
+    try:
+        from rapidocr import RapidOCR  # noqa: PLC0415  (maintained 3.x package, Python 3.11-3.14)
+    except ImportError:
+        from rapidocr_onnxruntime import RapidOCR  # noqa: PLC0415  (legacy 1.x package)
+        return RapidOCR()
+    return RapidOCR(params={
+        "Global.log_level": "warning",
+        "Global.max_side_len": MAX_SIDE,
+        "EngineConfig.onnxruntime.intra_op_num_threads": OCR_THREADS,
+        "EngineConfig.onnxruntime.inter_op_num_threads": 1,
+    })
 
 
 def _rapidocr():
+    """Process-wide singleton (never reloaded per request). Caller must hold _ocr_lock."""
     global _ocr_engine
-    with _ocr_lock:
-        if _ocr_engine is None:
-            try:
-                from rapidocr import RapidOCR  # noqa: PLC0415  (maintained 3.x package, Python 3.11-3.14)
-            except ImportError:
-                from rapidocr_onnxruntime import RapidOCR  # noqa: PLC0415  (legacy 1.x package)
-            _ocr_engine = RapidOCR()
-        return _ocr_engine
+    if _ocr_engine is None:
+        _ocr_engine = _new_engine()
+    return _ocr_engine
+
+
+def shrink(img: np.ndarray, max_side: int = MAX_SIDE) -> np.ndarray:
+    h, w = img.shape[:2]
+    scale = max_side / float(max(h, w))
+    if scale >= 1:
+        return img
+    return cv2.resize(img, (max(1, int(w * scale)), max(1, int(h * scale))), interpolation=cv2.INTER_AREA)
 
 
 def decode_image(data: bytes) -> np.ndarray:
-    arr = np.frombuffer(data, np.uint8)
-    img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+    """Decode then downscale to MAX_SIDE. Very large images are decoded at reduced resolution so a
+    phone's 48-MP photo can never blow the container's memory."""
+    flag = cv2.IMREAD_COLOR
+    try:
+        w, h = Image.open(io.BytesIO(data)).size
+        if w * h > MAX_PIXELS_FULL_DECODE:
+            flag = cv2.IMREAD_REDUCED_COLOR_4
+    except Exception:  # noqa: BLE001 - header sniffing is best-effort
+        pass
+    img = cv2.imdecode(np.frombuffer(data, np.uint8), flag)
     if img is None:
         raise ValueError("Not a decodable image")
-    return img
+    return shrink(img)
 
 
 def read_metadata(data: bytes) -> dict:
@@ -189,9 +228,12 @@ def run_ocr(img: np.ndarray, meta: dict) -> CnicExtraction:
     if mode == "fixture":
         return extract_fields([], 0.0, "none")
     try:
-        out = _rapidocr()(img)
-    except Exception:  # noqa: BLE001
+        with _ocr_lock:
+            out = _rapidocr()(img)
+    except (MemoryError, Exception):  # noqa: BLE001 - never crash the request: escalate to a human instead
         return extract_fields([], 0.0, "rapidocr-error")
+    finally:
+        gc.collect()
     if hasattr(out, "txts"):  # rapidocr >= 2: RapidOCROutput(txts, scores, boxes)
         lines, scores = list(out.txts or ()), [float(x) for x in (out.scores or ())]
     else:  # rapidocr_onnxruntime 1.x: ([box, text, score], ...), elapse
@@ -202,18 +244,49 @@ def run_ocr(img: np.ndarray, meta: dict) -> CnicExtraction:
     return extract_fields(lines, float(np.mean(scores)), "rapidocr")
 
 
+def _failure_result(sha: str, reason: str) -> dict:
+    return {"sha256": sha,
+            "quality": {"blur_variance": 0.0, "brightness": 0.0, "glare_ratio": 0.0, "quality_score": 0.0, "flags": []},
+            "qr_codes": [], "forgery": {"forgery_score": 0.0, "ela_score": 0.0, "edit_software": None, "edited_metadata": False},
+            "ocr": CnicExtraction(engine="vision-error").model_dump(), "flags": ["vision_engine_failure"],
+            "retake_tips": [], "vision_version": VISION_VERSION, "error": reason}
+
+
 def analyze_document(data: bytes) -> dict:
-    """Full single-image analysis (no DB). Duplicate-hash and registry QR checks happen in the caller."""
+    """Full single-image analysis (no DB). Duplicate-hash and registry QR checks happen in the caller.
+    Raises ValueError only for files that are not images; every engine failure becomes a flag."""
     sha = hashlib.sha256(data).hexdigest()
-    img = decode_image(data)
-    meta = read_metadata(data)
-    quality = quality_checks(img)
-    qr = decode_qr(img)
-    forgery = forgery_assessment(img, meta)
-    ocr = run_ocr(img, meta)
+    with _cache_lock:
+        if sha in _cache:  # the live photo check and the submit upload send the same bytes
+            _cache.move_to_end(sha)
+            return json.loads(json.dumps(_cache[sha]))
+    try:
+        img = decode_image(data)
+    except MemoryError:
+        gc.collect()
+        return _failure_result(sha, "memory")
+    try:
+        meta = read_metadata(data)
+        quality = quality_checks(img)
+        qr = decode_qr(img)
+        forgery = forgery_assessment(img, meta)
+        ocr = run_ocr(img, meta)
+    except (MemoryError, Exception) as e:  # noqa: BLE001
+        gc.collect()
+        return _failure_result(sha, type(e).__name__)
+    finally:
+        del img
     flags = list(quality["flags"])
-    if ocr.ocr_confidence < 0.6 and not flags:
+    if ocr.engine == "rapidocr-error":
+        flags.append("vision_engine_failure")
+    elif ocr.ocr_confidence < 0.6 and not flags:
         flags.append("low_ocr")
     tips = [{"flag": f, "en": TIPS[f][0], "ur": TIPS[f][1]} for f in flags if f in TIPS]
-    return {"sha256": sha, "quality": quality, "qr_codes": qr, "forgery": forgery,
-            "ocr": ocr.model_dump(), "flags": flags, "retake_tips": tips, "vision_version": VISION_VERSION}
+    result = {"sha256": sha, "quality": quality, "qr_codes": qr, "forgery": forgery,
+              "ocr": ocr.model_dump(), "flags": flags, "retake_tips": tips, "vision_version": VISION_VERSION}
+    if "vision_engine_failure" not in flags:  # never cache a transient failure
+        with _cache_lock:
+            _cache[sha] = json.loads(json.dumps(result))
+            while len(_cache) > _CACHE_SIZE:
+                _cache.popitem(last=False)
+    return result

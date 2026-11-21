@@ -27,6 +27,13 @@ def main() -> None:
                                                    qr_payload=rec["qr_code"], fixture_meta=meta, noise_seed=7))
     (OUT / "cnic_blurry.png").write_bytes(make_card(rec["full_name"], rec["father_name"], rec["cnic"], rec["dob"],
                                                     qr_payload=rec["qr_code"], fixture_meta=meta, blur=17))
+    # A phone-camera-sized JPEG (4000 px wide, no fixture text) -> exercises on-device shrinking + real OCR
+    import cv2  # noqa: PLC0415
+    import numpy as np  # noqa: PLC0415
+    card = cv2.imdecode(np.frombuffer(make_card(rec["full_name"], rec["father_name"], rec["cnic"], rec["dob"],
+                                                qr_payload=rec["qr_code"], noise_seed=9), np.uint8), cv2.IMREAD_COLOR)
+    big = cv2.resize(card, (4000, int(card.shape[0] * 4000 / card.shape[1])), interpolation=cv2.INTER_CUBIC)
+    (OUT / "cnic_phone.jpg").write_bytes(cv2.imencode(".jpg", big, [cv2.IMWRITE_JPEG_QUALITY, 95])[1].tobytes())
     applicant = {"full_name": rec["full_name"], "father_name_registry": rec["father_name"],
                  "father_name_variant": rec["father_name"].replace(first, VARIANT[first], 1),
                  "cnic": rec["cnic"], "dob": rec["dob"], "age": 2026 - int(rec["dob"][:4])}
