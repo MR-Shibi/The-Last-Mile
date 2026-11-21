@@ -9,3 +9,4 @@ node_modules/
 out/
 backend/app/ml/artifacts/*.joblib
 backend/.tts_cache/
+*.log
