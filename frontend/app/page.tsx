@@ -4,7 +4,7 @@ import Link from "next/link";
 import AppHeader from "@/components/AppHeader";
 import Icon, { type IconName } from "@/components/Icon";
 import SpeakButton from "@/components/SpeakButton";
-import { useSession } from "@/lib/api";
+import { isStaff, PORTAL, ROLE_LABEL, useSession } from "@/lib/api";
 import { useLang } from "@/lib/i18n";
 
 const CARDS: { href: string; icon: IconName; en: string; ur: string; sub_en: string; sub_ur: string }[] = [
@@ -23,6 +23,24 @@ export default function Home() {
     <>
       <AppHeader />
       <div className="mx-auto max-w-4xl px-4 pt-3 pb-2">
+        {session && isStaff(session.role) && (
+          <div data-testid="staff-return-banner" role="region" aria-label={L("Your portal", "آپ کا پورٹل")} className="mb-3 rounded-2xl border-2 border-brand bg-tint p-3 text-brand">
+            <p className="text-lg font-bold">
+              {L(`You are currently signed in as ${ROLE_LABEL[session.role][0]}.`, `آپ اس وقت ${ROLE_LABEL[session.role][1]} کے طور پر سائن ان ہیں۔`)}
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Link href={PORTAL[session.role].href} data-testid="staff-return-button" className="btn btn-primary">
+                {L(`Return to ${ROLE_LABEL[session.role][0]} Portal`, `${ROLE_LABEL[session.role][1]} پورٹل پر واپس جائیں`)}{" "}
+                <Icon name="forward" size={20} className="rtl:rotate-180" />
+              </Link>
+              {session.role === "platform_admin" && (
+                <Link href="/eval" className="btn btn-secondary">
+                  <Icon name="chart" size={20} /> {L("Evaluation dashboard", "جائزہ ڈیش بورڈ")}
+                </Link>
+              )}
+            </div>
+          </div>
+        )}
         {/* Compact hero: one headline + one sentence, so the 4 service cards sit above the fold */}
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">

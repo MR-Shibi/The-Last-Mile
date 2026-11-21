@@ -131,6 +131,17 @@ export const ROLE_LABEL: Record<Role, [string, string]> = {
   auditor: ["Auditor", "آڈیٹر"],
 };
 
+/** Each role's own console, for the header "My Portal" button and the Home quick-return banner. */
+export const PORTAL: Record<Role, { href: string; en: string; ur: string }> = {
+  citizen: { href: "/citizen", en: "My Application", ur: "میری درخواست" },
+  community_helper: { href: "/helper", en: "Helper Dashboard", ur: "مددگار ڈیش بورڈ" },
+  department_officer: { href: "/officer", en: "Officer Console", ur: "افسر ڈیش بورڈ" },
+  platform_admin: { href: "/admin", en: "Admin Portal", ur: "ایڈمن پورٹل" },
+  auditor: { href: "/auditor", en: "Auditor Log", ur: "آڈیٹر لاگ" },
+};
+
+export const isStaff = (r: Role) => r === "platform_admin" || r === "department_officer" || r === "auditor";
+
 /** Which roles may open which area (UX mirror of the server's RBAC). */
 const AREA_ROLES: [string, Role[]][] = [
   ["/citizen", ["citizen"]],

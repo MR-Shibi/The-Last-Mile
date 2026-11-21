@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import Icon, { type IconName } from "@/components/Icon";
 import { PageShell } from "@/components/ui";
 import { afterLoginPath, hardNavigate, HOME_FOR_ROLE, login, logoutAndGoHome, ROLE_LABEL, useSession } from "@/lib/api";
@@ -22,6 +23,12 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const session = useSession();
+  const router = useRouter();
+  // Already-signed-in staff/helpers go straight to their console instead of a re-login screen
+  const autoGo = !!session && !busy && session.role !== "citizen";
+  useEffect(() => {
+    if (autoGo && session) router.replace(HOME_FOR_ROLE[session.role]);
+  }, [autoGo, session, router]);
 
   async function go(e: React.FormEvent) {
     e.preventDefault();
@@ -36,6 +43,16 @@ export default function LoginPage() {
       setError(L("Wrong username or password", "غلط نام یا پاس ورڈ"));
       setBusy(false);
     }
+  }
+
+  if (autoGo && session) {
+    return (
+      <PageShell title={L("Login", "لاگ ان")}>
+        <p data-testid="login-redirecting" role="status" className="card mx-auto max-w-md p-5 text-lg">
+          {L("You are already signed in — opening your portal…", "آپ پہلے سے سائن ان ہیں — آپ کا پورٹل کھل رہا ہے…")}
+        </p>
+      </PageShell>
+    );
   }
 
   if (session && !busy) {

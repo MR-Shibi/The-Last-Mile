@@ -427,6 +427,18 @@ test("7 — officer queue, consent take-back, admin Digital Twin + faults, audit
   await english(page);
   await uiLogin(page, "sindh.officer", "/officer");
   await expect(page.getByRole("heading", { name: /Queue/ })).toBeVisible();
+
+  // No one-way trap: Home shows a quick-return banner, /login sends staff straight back, the header has My Portal
+  await page.goto("/");
+  await expect(page.getByTestId("staff-return-banner")).toContainText("You are currently signed in as Department Officer.");
+  await page.getByTestId("staff-return-button").click();
+  await expect(page).toHaveURL(/\/officer$/);
+  await page.goto("/login");
+  await expect(page).toHaveURL(/\/officer$/);
+  await page.goto("/scam");
+  await page.getByTestId("portal-button").click();
+  await expect(page).toHaveURL(/\/officer$/);
+  await expect(page.getByRole("heading", { name: /Queue/ })).toBeVisible();
   await page.getByRole("button", { name: new RegExp(`#${c.id}\\b`) }).click();
   await expect(page.getByRole("heading", { name: new RegExp(`Case #${c.id}`) })).toBeVisible();
   await expect(page.getByText("Input vs OCR vs Registry")).toBeVisible();

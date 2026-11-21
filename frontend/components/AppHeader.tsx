@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import DecisionModal from "@/components/DecisionModal";
 import Icon from "@/components/Icon";
-import { FLASH_KEY, logoutAndGoHome, ROLE_LABEL, useSession } from "@/lib/api";
+import { FLASH_KEY, logoutAndGoHome, PORTAL, ROLE_LABEL, useSession } from "@/lib/api";
 import { useLang } from "@/lib/i18n";
 import { useOnline, useSessionValue, writeSessionValue } from "@/lib/stores";
 import { listOutbox, ownedBy } from "@/lib/offlineDb";
@@ -142,13 +142,23 @@ export default function AppHeader({ title }: { title?: string }) {
                 <span className="font-normal"> · <span dir="auto">{session.full_name}</span></span>
               </span>
             </span>
+            {/* Way back to the role's own console from anywhere (Home included) */}
+            <Link
+              href={PORTAL[session.role].href}
+              data-testid="portal-button"
+              aria-current={pathname === PORTAL[session.role].href ? "page" : undefined}
+              className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl bg-gold px-3 font-semibold text-ink hover:brightness-95 sm:px-4"
+            >
+              <Icon name="layers" size={20} className="hidden sm:block" /> {L(PORTAL[session.role].en, PORTAL[session.role].ur)}
+            </Link>
             <button
               type="button"
               data-testid="logout-button"
               onClick={() => void logoutAndGoHome()}
+              aria-label={L("Logout", "لاگ آؤٹ")}
               className={`${navBtn} border-2 border-white/70`}
             >
-              <Icon name="logout" size={20} /> {L("Logout", "لاگ آؤٹ")}
+              <Icon name="logout" size={20} /> <span className="hidden sm:inline">{L("Logout", "لاگ آؤٹ")}</span>
             </button>
           </>
         ) : (
