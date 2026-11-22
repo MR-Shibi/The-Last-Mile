@@ -27,7 +27,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="ur" dir="rtl" suppressHydrationWarning className={`${inter.variable} ${nastaliq.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col bg-page pb-8 text-ink" suppressHydrationWarning>
+      <body className="min-h-full flex flex-col bg-page text-ink" suppressHydrationWarning>
         <LanguageProvider>
           <main className="flex-1">{children}</main>
           <SafetyBar />
