@@ -10,13 +10,25 @@ import threading
 from collections.abc import Iterable
 from datetime import datetime, timezone
 
-from sqlalchemy import event, select
+from sqlalchemy import event, select, text
 from sqlalchemy.orm import Session
 
 from app.models import AuditLog
 
 GENESIS_HASH = "0" * 64
 _append_lock = threading.Lock()
+# Postgres transaction-level advisory lock key ("LMAUDIT"): serialises chain appends across threads AND processes
+# until the writing transaction commits/rolls back.
+AUDIT_LOCK_KEY = 0x4C4D4155444954
+
+
+def _lock_chain_for_transaction(db: Session) -> None:
+    """With commit=False the new row stays uncommitted (invisible to other sessions) until the caller commits.
+    Without a transaction-scoped lock, a concurrent request reads the same 'last hash' and forks the chain
+    (seen live: two rows 7 ms apart sharing one prev_hash). pg_advisory_xact_lock is held until this
+    transaction ends, so the next writer always chains from the committed head; Postgres detects deadlocks on it."""
+    if db.get_bind().dialect.name == "postgresql":
+        db.execute(text("SELECT pg_advisory_xact_lock(:k)"), {"k": AUDIT_LOCK_KEY})
 
 
 def canonical_json(obj) -> str:  # noqa: ANN001
@@ -53,8 +65,9 @@ def write_audit(
     payload: dict | None = None,
     commit: bool = True,
 ) -> AuditLog:
-    """Append one audit row. Serialised with a process lock so the chain stays linear."""
+    """Append one audit row. Serialised (process lock + Postgres transaction advisory lock) so the chain stays linear."""
     with _append_lock:
+        _lock_chain_for_transaction(db)
         last = db.execute(select(AuditLog.row_hash).order_by(AuditLog.id.desc()).limit(1)).scalar()
         prev = last or GENESIS_HASH
         row = AuditLog(
