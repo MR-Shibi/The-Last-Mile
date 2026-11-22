@@ -45,15 +45,16 @@
 }
 
 html {
-  background: var(--page);
+  background: #F9F9F8;
 }
 
 body {
-  /* Civic star-and-arch lattice: inline SVG (<1 KB, no request), #123C35 strokes at 3.5% opacity — texture only;
-   * every reading surface (cards, inputs, panels) stays solid, so text contrast is unchanged. */
-  background-color: var(--page);
-  background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64' fill='none' stroke='%23123C35' stroke-opacity='.035' stroke-width='1.2'><rect x='24' y='24' width='16' height='16'/><rect x='24' y='24' width='16' height='16' transform='rotate(45 32 32)'/><path d='M0 64V52a10 10 0 0 1 20 0v12M44 64V52a10 10 0 0 1 20 0v12M0 0h64M32 0v14M32 50v14M0 32h14M50 32h14'/></svg>");
-  background-size: 64px 64px;
+  /* Civic doodle page canvas (public/civic-doodle.svg, seamless 360px tile, pale grey monoline icons).
+   * Background only: cards, header, notice strip and footer keep their own solid fills. */
+  background-color: #F9F9F8;
+  background-image: url('/civic-doodle.svg');
+  background-repeat: repeat;
+  background-size: 360px 360px;
   color: var(--ink);
   font-family: var(--font-inter), system-ui, Arial, sans-serif;
   font-size: 18px; /* minimum readable body size */

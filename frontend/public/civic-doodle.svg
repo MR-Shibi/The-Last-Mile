@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="360" viewBox="0 0 360 360">
+  <defs>
+    <path id="star" d="M0 -6L1.6 -1.6L6 0L1.6 1.6L0 6L-1.6 1.6L-6 0L-1.6 -1.6Z"/>
+    <path id="cross" d="M-3.5 0H3.5M0 -3.5V3.5"/>
+    <g id="speaker"><path d="M-16 -6H-9L0 -14V14L-9 6H-16Z"/><path d="M6 -5Q11 0 6 5M10 -10Q19 0 10 10"/></g>
+  </defs>
+  <rect width="360" height="360" fill="#F9F9F8"/>
+  <g fill="none" stroke="#E8E8E6" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round">
+    <!-- 1 helping hands -->
+    <g transform="translate(70 72)">
+      <path d="M-22 -2C-14 -2 -10 2 -4 2H6C9 2 9 7 6 7H-3"/>
+      <path d="M-22 8C-14 8 -8 13 0 13C7 13 13 9 20 1C22 -1 20 -4 17 -3L8 3"/>
+      <path d="M-4 -8C-7 -12 -6 -16 -2 -16C0 -16 1 -14 2 -13C3 -14 4 -16 6 -16C10 -16 11 -12 8 -8L2 -3Z"/>
+    </g>
+    <!-- 2 house with a heart -->
+    <g transform="translate(190 60)">
+      <path d="M-20 0L0 -18L20 0"/>
+      <path d="M-15 -4V18H15V-4"/>
+      <path d="M0 13C-6 9 -8 6 -6 3C-4 1 -1 2 0 4C1 2 4 1 6 3C8 6 6 9 0 13Z"/>
+    </g>
+    <!-- 3 smartphone with a security shield -->
+    <g transform="translate(300 96)">
+      <rect x="-12" y="-21" width="24" height="42" rx="4"/>
+      <path d="M-3 16H3"/>
+      <path d="M0 -12L7 -9V-4C7 1 4 4 0 5C-4 4 -7 1 -7 -4V-9Z"/>
+      <path d="M-3 -4L-1 -2L3 -6"/>
+    </g>
+    <!-- 4 SMS chat bubble -->
+    <g transform="translate(108 214)">
+      <path d="M-18 -14H18A4 4 0 0 1 22 -10V6A4 4 0 0 1 18 10H-6L-14 17V10H-18A4 4 0 0 1 -22 6V-10A4 4 0 0 1 -18 -14Z"/>
+      <path d="M-14 -6H14M-14 0H14M-14 6H2"/>
+    </g>
+    <!-- 5 document form with magnifying glass -->
+    <g transform="translate(250 242)">
+      <path d="M-15 -21H7L15 -13V19H-15Z"/>
+      <path d="M7 -21V-13H15"/>
+      <path d="M-9 -9H6M-9 -3H6M-9 3H0"/>
+      <circle cx="6" cy="11" r="7"/>
+      <path d="M11 16L18 23"/>
+    </g>
+    <!-- 6 speaker / audio waves: straddles the left/right edge, drawn on both sides for a seamless wrap -->
+    <use href="#speaker" transform="translate(0 300)"/>
+    <use href="#speaker" transform="translate(360 300)"/>
+    <!-- 7 fillers: corner stars wrap on all four corners -->
+    <use href="#star" transform="translate(0 0)"/>
+    <use href="#star" transform="translate(360 0)"/>
+    <use href="#star" transform="translate(0 360)"/>
+    <use href="#star" transform="translate(360 360)"/>
+    <use href="#star" transform="translate(180 150)"/>
+    <use href="#star" transform="translate(32 178)"/>
+    <use href="#star" transform="translate(322 182)"/>
+    <use href="#star" transform="translate(176 312)"/>
+    <use href="#cross" transform="translate(130 128)"/>
+    <use href="#cross" transform="translate(246 146)"/>
+    <use href="#cross" transform="translate(84 318)"/>
+    <use href="#cross" transform="translate(312 326)"/>
+    <use href="#cross" transform="translate(250 16)"/>
+    <circle cx="122" cy="28" r="1"/>
+    <circle cx="238" cy="112" r="1"/>
+    <circle cx="338" cy="252" r="1"/>
+    <circle cx="160" cy="268" r="1"/>
+    <circle cx="40" cy="128" r="1"/>
+    <circle cx="214" cy="344" r="1"/>
+    <circle cx="12" cy="40" r="1"/>
+  </g>
+</svg>
