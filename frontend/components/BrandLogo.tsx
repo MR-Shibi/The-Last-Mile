@@ -14,16 +14,16 @@ function FallbackEmblem() {
   );
 }
 
-/** The emblem inside a white circular medallion with a warm-gold ring (reads crisply on the #123C35 header). */
+/** The emblem on a borderless white curved square (squircle) that reads crisply on the #123C35 header. */
 export default function BrandLogo({ size = "h-12 w-12", padding = "p-1.5" }: { size?: string; padding?: string }) {
   const [broken, setBroken] = useState(false);
   return (
-    <div className={`${size} ${padding} flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-white shadow-sm ring-2 ring-gold`}>
+    <div className={`${size} ${padding} flex shrink-0 items-center justify-center overflow-hidden rounded-2xl border-0 bg-white shadow-sm ring-0`}>
       {broken ? (
         <FallbackEmblem />
       ) : (
         // eslint-disable-next-line @next/next/no-img-element -- 9.6 KB static emblem; next/image adds nothing here
-        <img src="/logo.png" alt="The Last Mile Emblem" width={48} height={48} decoding="async" onError={() => setBroken(true)} className="h-full w-full rounded-full object-contain" />
+        <img src="/logo.png" alt="The Last Mile Emblem" width={48} height={48} decoding="async" onError={() => setBroken(true)} className="h-full w-full rounded-xl object-contain" />
       )}
     </div>
   );
