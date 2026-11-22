@@ -1,6 +1,6 @@
 /**
  * Real-browser E2E suite (headless Chromium) for The Last Mile PWA.
- * PROTOTYPE — Simulated DPI & Synthetic Data Only.
+ * Prototype Notice: Synthetic data only. Not an official government service.
  *
  * Every test is wrapped by a watcher that fails on: uncaught page errors, console.error output, and any
  * API response >= 400 that the test did not explicitly expect.
@@ -178,6 +178,7 @@ test("1 — zero console/network errors and Urdu RTL layout without overlaps", a
   await page.goto("/");
   await expect(page.locator("html")).toHaveAttribute("dir", "ltr");
   await assertCardsDoNotOverlap(page);
+  await expect(page.getByTestId("prototype-notice")).toContainText("Prototype Notice: Synthetic data only");
 
   await page.getByRole("button", { name: "اردو" }).click();
   await expect(page.locator("html")).toHaveAttribute("dir", "rtl");

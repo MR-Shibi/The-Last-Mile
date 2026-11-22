@@ -1,7 +1,7 @@
 # CLAUDE.md — Coder's Cup '26: The Last Mile (AI on Public Rails)
 
 ## Mission & Non-Negotiable Rules
-1. **Prototype & Synthetic Data Only:** Every screen footer and README must display: *"PROTOTYPE — Simulated DPI & Synthetic Data Only."* Never use real CNICs, phone numbers, or personal data.
+1. **Prototype & Synthetic Data Only:** Every screen (in the notice strip above the footer) and the README must display: *"Prototype Notice: Synthetic data only. Not an official government service. AI never approves applications or sends real payments."* Never use real CNICs, phone numbers, or personal data.
 2. **Not a Chatbot:** This is a multi-tenant, role-enforced SaaS platform with server-side RBAC, revocable consent middleware, versioned JSON rules, and hash-chained append-only audit logs.
 3. **Strict Phase-Gate Execution:** You MUST work strictly one phase at a time. Never start Phase N+1 until Phase N's automated test suite (`pytest` / API checks) runs and passes 100%, and a clean Git commit is created for Phase N.
 4. **Never Auto-Reject:** The AI decision engine may `AUTO_RECOMMEND` (`p >= 0.95`), `ASK_MORE_PROOF` (`0.70 <= p < 0.95`), or `ESCALATE_HUMAN` (`p < 0.70` or any hard-rule/anomaly flag). Only a human Department Officer can reject a case.

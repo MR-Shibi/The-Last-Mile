@@ -1,6 +1,6 @@
 # The Last Mile: AI on Public Rails
 
-> **PROTOTYPE — Simulated DPI & Synthetic Data Only.** No real CNICs, phone numbers, government systems or personal data are used anywhere. Every name, CNIC, phone number, QR code and SMS in this repository is synthetic.
+> **Prototype Notice: Synthetic data only. Not an official government service. AI never approves applications or sends real payments.** No real CNICs, phone numbers, government systems or personal data are used anywhere. Every name, CNIC, phone number, QR code and SMS in this repository is synthetic.
 
 **One sentence:** a low-literacy widow can apply for a relief grant by Urdu voice and a CNIC photo on a weak connection, a shopkeeper can check whether a "relief payment" SMS is a scam, and a community helper can safely manage up to 40 families on one shared phone — all on a multi-tenant, consent-gated platform where the AI can recommend but never reject.
 
@@ -247,4 +247,4 @@ Interactive docs: `http://localhost:8000/docs`. Main groups:
 
 ---
 
-*PROTOTYPE — Simulated DPI & Synthetic Data Only.*
+*Prototype Notice: Synthetic data only. Not an official government service. AI never approves applications or sends real payments.*
