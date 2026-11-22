@@ -246,7 +246,7 @@ function HelperMode({ session }: { session: Session }) {
       {/* Persistent active-family banner */}
       <div
         data-testid="family-banner"
-        className={`sticky top-[100px] z-30 mb-4 flex items-center gap-3 rounded-2xl border-2 px-4 py-3 shadow-sm ${active ? (active.can_act ? "border-brand bg-brand text-white" : "panel-review") : "border-line bg-card text-ink"}`}
+        className={`sticky top-2 z-30 mb-4 sm:top-[100px] flex items-center gap-3 rounded-2xl border-2 px-4 py-3 shadow-sm ${active ? (active.can_act ? "border-brand bg-brand text-white" : "panel-review") : "border-line bg-card text-ink"}`}
         role="status"
       >
         <span className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${active ? "bg-gold text-ink" : "bg-tint text-brand"}`} aria-hidden><Icon name="users" size={22} /></span>

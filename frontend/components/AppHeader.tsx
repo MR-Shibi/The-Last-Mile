@@ -67,7 +67,7 @@ export default function AppHeader({ title }: { title?: string }) {
 
   const navBtn = "inline-flex min-h-[44px] items-center gap-1.5 rounded-xl px-3 font-bold text-white hover:bg-white/10";
   return (
-    <header className="sticky top-0 z-40 bg-brand text-white shadow-sm">
+    <header className="relative z-40 bg-brand sm:sticky sm:top-0 text-white shadow-sm">
       <div className="mx-auto flex max-w-6xl items-center gap-2 px-3 pt-1.5">
         <Link href="/" className="flex min-h-[44px] items-center gap-2 rounded-xl pe-2 text-xl font-bold whitespace-nowrap">
           <BrandLogo />
