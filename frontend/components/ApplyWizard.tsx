@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { api, ApiError, type Receipt, type Scheme } from "@/lib/api";
+import { api, ApiError, useSession, type Receipt, type Scheme } from "@/lib/api";
 import { useLang } from "@/lib/i18n";
 import { formatBytes, shrinkForUpload } from "@/lib/image";
 import { formatCnic, normalizeDigits, parseSpokenAmount, parseSpokenCnic } from "@/lib/urduNumberParser";
@@ -25,7 +25,7 @@ const Q_TEXT: Record<TextKey, Q> = {
   father_name: { key: "father_name", en: "What is your father's (or husband's) name?", ur: "آپ کے والد (یا شوہر) کا نام کیا ہے؟", kind: "text" },
   cnic: { key: "cnic", en: "What is your CNIC number? (13 digits)", ur: "آپ کا شناختی کارڈ نمبر کیا ہے؟ (13 ہندسے)", kind: "cnic", hint_en: "Example: 42501-1234567-1 — type it, say it digit by digit, or use the keypad", hint_ur: "مثال: 42501-1234567-1 — لکھیں، ایک ایک ہندسہ بولیں، یا کی پیڈ استعمال کریں" },
   age: { key: "age", en: "How old are you?", ur: "آپ کی عمر کتنی ہے؟", kind: "number" },
-  monthly_income: { key: "monthly_income", en: "What is your household's monthly income in rupees?", ur: "آپ کے گھر کی ماہانہ آمدنی کتنے روپے ہے؟", kind: "number", hint_en: "Numbers or words both work, e.g. \"dedh lakh\" or \"sadhe teen hazar\"", hint_ur: "ہندسے یا الفاظ دونوں چلیں گے، جیسے ڈیڑھ لاکھ یا ساڑھے تین ہزار" },
+  monthly_income: { key: "monthly_income", en: "What is your household's monthly income in rupees?", ur: "آپ کے گھر کی ماہانہ آمدنی کتنے روپے ہے؟", kind: "number", hint_en: "Type digits, or tap the mic and say it, e.g. \"dedh lakh\" or \"sadhe teen hazar\"", hint_ur: "ہندسے لکھیں، یا مائیک دبا کر بولیں، جیسے ڈیڑھ لاکھ یا ساڑھے تین ہزار" },
   dependents: { key: "dependents", en: "How many children or dependents live with you?", ur: "آپ کے ساتھ کتنے بچے یا زیرِ کفالت افراد رہتے ہیں؟", kind: "number" },
 };
 const Q_CHOICE: Record<ChoiceKey, Prompt> = {
@@ -48,6 +48,17 @@ const STEPS = [
 
 interface VisionResult { flags: string[]; ok_to_submit: boolean; retake_tips: { flag: string; en: string; ur: string }[] }
 
+/** Age and income accept positive whole numbers only: typed/pasted text is reduced to 0-9 (Urdu digits ۰-۹ are
+ * converted, everything else dropped); spoken words still go through the Urdu/English number parser first. */
+const DIGITS_ONLY: ReadonlySet<TextKey> = new Set<TextKey>(["age", "monthly_income"]);
+const onlyDigits = (raw: string) => normalizeDigits(raw).replace(/[^0-9]/g, "");
+const EDIT_KEYS = new Set(["Backspace", "Delete", "Tab", "Enter", "Escape", "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"]);
+/** true = let the key through. Unidentified/Process = Android IME (keyCode 229): onChange sanitises those. */
+function digitKeyAllowed(e: React.KeyboardEvent<HTMLInputElement>): boolean {
+  if (e.ctrlKey || e.metaKey || e.altKey || EDIT_KEYS.has(e.key) || e.key === "Unidentified" || e.key === "Process") return true;
+  return /^[0-9۰-۹٠-٩]$/.test(e.key);
+}
+
 /** Typed digits ("15000", "1,500", "۱۵۰۰۰") or words ("ڈیڑھ لاکھ", "pandrah hazar") -> number. */
 function toNumber(raw: string): number | string {
   const n = Number(normalizeDigits(raw).replace(/,/g, ""));
@@ -60,10 +71,15 @@ function toNumber(raw: string): number | string {
 export default function ApplyWizard({ scheme, citizenUserId, onCancel }: { scheme: Scheme; citizenUserId?: number; onCancel: () => void }) {
   const { lang, L } = useLang();
   const isHelper = citizenUserId !== undefined;
+  const session = useSession();
+  // Signed-in citizen applying for themselves: prefill + lock their own account name (helpers/guests start blank)
+  const accountName = !isHelper && session?.role === "citizen" ? session.full_name?.trim() || "" : "";
+  const [nameLocked, setNameLocked] = useState(!!accountName);
+  const [digitWarn, setDigitWarn] = useState<Partial<Record<TextKey, boolean>>>({});
   const [step, setStep] = useState(0); // 0..3
   const [showAll, setShowAll] = useState(false);
   const [consent, setConsent] = useState<Record<string, boolean>>({});
-  const [fields, setFields] = useState<Record<TextKey, string>>({ full_name: "", father_name: "", cnic: "", age: "", monthly_income: "", dependents: "" });
+  const [fields, setFields] = useState<Record<TextKey, string>>({ full_name: accountName, father_name: "", cnic: "", age: "", monthly_income: "", dependents: "" });
   const [choices, setChoices] = useState<{ province?: string; is_widow?: boolean; receives_other_grant?: boolean }>({});
   const [photo, setPhoto] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -112,7 +128,9 @@ export default function ApplyWizard({ scheme, citizenUserId, onCancel }: { schem
   const need = (ok: boolean, s: number, q: Prompt) => { if (!ok) missing.push({ step: s, q }); };
   need(!!fields.full_name.trim(), 0, Q_TEXT.full_name);
   need(!!fields.father_name.trim(), 0, Q_TEXT.father_name);
-  need(isNum("age"), 0, Q_TEXT.age);
+  const ageNum = Number(fields.age);
+  const ageOk = /^[0-9]+$/.test(fields.age) && ageNum >= 1 && ageNum <= 120;
+  need(ageOk, 0, Q_TEXT.age);
   need(!!choices.province, 0, Q_CHOICE.province);
   need(choices.is_widow !== undefined, 0, Q_CHOICE.is_widow);
   need(cnicDigits.length === 13, 1, Q_TEXT.cnic);
@@ -272,7 +290,10 @@ export default function ApplyWizard({ scheme, citizenUserId, onCancel }: { schem
   const textField = (k: TextKey) => {
     const q = Q_TEXT[k];
     const id = `apply-${k}`;
-    const words = q.kind === "number" && !!fields[k].trim() && !/^[\d,.\s]+$/.test(normalizeDigits(fields[k]));
+    const digitsOnly = DIGITS_ONLY.has(k);
+    const lockedName = k === "full_name" && nameLocked;
+    const flagDigits = (bad: boolean) => setDigitWarn((w) => (w[k] === bad ? w : { ...w, [k]: bad }));
+    const words = !digitsOnly && q.kind === "number" && !!fields[k].trim() && !/^[\d,.\s]+$/.test(normalizeDigits(fields[k]));
     const parsed = words ? toNumber(fields[k]) : null;
     return (
       <div className="card p-4" key={k}>
@@ -281,13 +302,54 @@ export default function ApplyWizard({ scheme, citizenUserId, onCancel }: { schem
           id={id}
           data-testid={`field-${k}`}
           value={fields[k]}
-          onChange={(e) => setField(k, q.kind === "cnic" ? formatCnic(normalizeDigits(e.target.value)) : e.target.value)}
-          inputMode={q.kind === "cnic" ? "numeric" : "text"}
+          type="text"
+          onChange={(e) => {
+            if (digitsOnly) {
+              const clean = onlyDigits(e.target.value);
+              flagDigits(clean !== normalizeDigits(e.target.value));
+              setField(k, clean);
+            } else setField(k, q.kind === "cnic" ? formatCnic(normalizeDigits(e.target.value)) : e.target.value);
+          }}
+          onKeyDown={digitsOnly ? (e) => { if (!digitKeyAllowed(e)) { e.preventDefault(); flagDigits(true); } } : undefined}
+          onPaste={digitsOnly ? (e) => {
+            e.preventDefault();
+            const t = e.currentTarget;
+            const pasted = e.clipboardData.getData("text");
+            const clean = onlyDigits(pasted);
+            flagDigits(clean !== pasted.trim());
+            const v = t.value;
+            setField(k, onlyDigits(v.slice(0, t.selectionStart ?? v.length) + clean + v.slice(t.selectionEnd ?? v.length)));
+          } : undefined}
+          inputMode={q.kind === "cnic" || digitsOnly ? "numeric" : "text"}
+          pattern={digitsOnly ? "[0-9]*" : undefined}
+          maxLength={k === "age" ? 3 : undefined}
+          readOnly={lockedName}
+          aria-describedby={lockedName ? `${id}-auto` : digitsOnly ? `${id}-rule` : undefined}
+          aria-invalid={k === "age" && !!fields.age && !ageOk ? true : undefined}
           autoComplete="off"
           dir={q.kind === "text" ? undefined : "ltr"}
           placeholder={q.kind === "cnic" ? "42501-1234567-1" : ""}
-          className="field mt-3 text-2xl"
+          className={`field mt-3 text-2xl ${lockedName ? "bg-tint/60 text-ink" : ""}`}
         />
+        {k === "full_name" && accountName && (
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <p id={`${id}-auto`} className="flex-1 text-base text-slate">
+              {nameLocked ? L("Auto-filled from your signed-in account", "آپ کے لاگ ان اکاؤنٹ سے خودکار درج شدہ") : L("You can correct the spelling now.", "اب آپ ہجے درست کر سکتے ہیں۔")}
+            </p>
+            {nameLocked && (
+              <button type="button" data-testid="full-name-edit" aria-controls={id} onClick={() => { setNameLocked(false); document.getElementById(id)?.focus(); }}
+                className="inline-flex min-h-[44px] items-center gap-1.5 rounded-xl border-2 border-brand bg-card px-3 text-base font-bold text-brand hover:bg-tint">
+                <Icon name="form" size={18} /> {L("Edit", "تبدیل کریں")}
+              </button>
+            )}
+          </div>
+        )}
+        {k === "age" && !!fields.age && !ageOk && (
+          <p role="alert" className="mt-2 text-lg font-bold text-danger-ink">{L("Enter a valid age between 1 and 120", "براہِ کرم 1 سے 120 کے درمیان درست عمر درج کریں")}</p>
+        )}
+        {digitsOnly && digitWarn[k] && (
+          <p id={`${id}-rule`} role="status" className="mt-2 text-base font-bold text-review-ink">{L("Digits only (0–9)", "صرف مثبت ہندسے درج کریں")}</p>
+        )}
         {typeof parsed === "number" && (
           <p className="mt-2 text-lg font-bold text-brand">= <span dir="ltr" className="inline-block">{k === "monthly_income" ? `Rs ${parsed.toLocaleString()}` : parsed}</span></p>
         )}
@@ -298,7 +360,18 @@ export default function ApplyWizard({ scheme, citizenUserId, onCancel }: { schem
             onClear={() => setField(k, "")}
           />
         )}
-        <VoiceInput field={k} onConfirm={(v) => setField(k, q.kind === "cnic" ? formatCnic(v.replace(/\D/g, "")) : v)} />
+        <VoiceInput
+          field={k}
+          onConfirm={(v) => {
+            if (q.kind === "cnic") setField(k, formatCnic(v.replace(/\D/g, "")));
+            else if (digitsOnly) {
+              // spoken "پینتالیس" / "ڈیڑھ لاکھ" -> parser -> clean digits ("45" / "150000")
+              const n = toNumber(v);
+              setField(k, typeof n === "number" && n >= 0 ? String(Math.round(n)) : onlyDigits(v));
+              flagDigits(false);
+            } else setField(k, v);
+          }}
+        />
       </div>
     );
   };

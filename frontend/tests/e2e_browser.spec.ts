@@ -134,7 +134,13 @@ async function fillApplication(
       await expect(sw).toHaveAttribute("aria-checked", "true");
     }
   }
-  await page.getByTestId("field-full_name").fill(a.full_name);
+  // Signed-in citizens get their account name pre-filled and locked; "Edit" unlocks it for a spelling fix
+  const nameField = page.getByTestId("field-full_name");
+  if (await nameField.getAttribute("readonly") !== null) {
+    await expect(nameField).not.toHaveValue("");
+    await page.getByTestId("full-name-edit").click();
+  }
+  await nameField.fill(a.full_name);
   await page.getByTestId("field-father_name").fill(a.father);
   await page.getByTestId("field-age").fill(String(a.age));
   await page.getByTestId("choice-province-Sindh").click();
@@ -299,8 +305,11 @@ test("4 — offline outbox queues the application and syncs once without duplica
   await english(page);
   await uiLogin(page, user, "/citizen");
   await openScheme(page);
-  await fillApplication(page, { full_name: name, father: "Muhammed Ali", cnic: "42101-1111111-1", age: 40, income: "nau hazar" }, { showAll: true });
-  await expect(page.getByText("= Rs 9,000")).toBeVisible(); // colloquial words parsed on-device
+  await fillApplication(page, { full_name: name, father: "Muhammed Ali", cnic: "42101-1111111-1", age: 40, income: "Rs -9,000.e" }, { showAll: true });
+  await expect(page.getByTestId("field-monthly_income")).toHaveValue("9000"); // only 0-9 survive typing/pasting
+  await page.getByTestId("field-age").fill("150");
+  await expect(page.getByText("Enter a valid age between 1 and 120")).toBeVisible();
+  await page.getByTestId("field-age").fill("40");
 
   await context.setOffline(true);
   await page.getByRole("button", { name: "Submit application" }).click();
