@@ -75,6 +75,7 @@ export default function ApplyWizard({ scheme, citizenUserId, onCancel }: { schem
   const [triedSubmit, setTriedSubmit] = useState(false);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [queued, setQueued] = useState<string | null>(null);
+  const [helperLink, setHelperLink] = useState<{ pin: string; name: string | null } | null>(null);
   const eventId = useRef(newClientEventId());
   const consentsSaved = useRef(false);
   const topRef = useRef<HTMLDivElement>(null);
@@ -134,7 +135,9 @@ export default function ApplyWizard({ scheme, citizenUserId, onCancel }: { schem
     for (const scope of chosen) {
       if (navigator.onLine) {
         try {
-          await api("/consents", { body: { scope } });
+          const r = await api<{ helper_pin?: string; helper_name?: string | null }>("/consents", { body: { scope } });
+          // First "my helper may help me" consent links a community helper and returns a one-time family PIN
+          if (r.helper_pin) setHelperLink({ pin: r.helper_pin, name: r.helper_name ?? null });
         } catch {
           await enqueue("consent_grant", { scope });
         }
@@ -214,7 +217,20 @@ export default function ApplyWizard({ scheme, citizenUserId, onCancel }: { schem
     return (
       <section>
         {receipt ? (
-          <Parchi r={receipt} />
+          <>
+            <Parchi r={receipt} />
+            {helperLink && (
+              <div data-testid="helper-link-pin" className="panel-safe mt-4 rounded-2xl p-4" role="status">
+                <h3 className="text-xl font-bold">{L("Your community helper is linked", "آپ کی کمیونٹی مددگار شامل ہو گئی")}</h3>
+                <p className="mt-1 text-lg">
+                  {L(`${helperLink.name || "Your helper"} can now see this application. To let them open it, tell them this family PIN in person:`,
+                    `${helperLink.name || "آپ کی مددگار"} اب یہ درخواست دیکھ سکتی ہیں۔ انہیں کھولنے کے لیے یہ خاندانی پن خود بتائیں:`)}
+                </p>
+                <p className="mt-2 text-center font-mono text-4xl font-bold tracking-[0.4em]" dir="ltr">{helperLink.pin}</p>
+                <p className="mt-2 text-base">{L("Shown only once — write it down. You can take helper access back any time under “Who has my data?”.", "یہ صرف ایک بار دکھایا جائے گا — لکھ لیں۔ مددگار کی اجازت کسی بھی وقت “میرا ڈیٹا کس کے پاس ہے؟” میں واپس لے سکتے ہیں۔")}</p>
+              </div>
+            )}
+          </>
         ) : (
           <div className="panel-review rounded-2xl p-6 text-center" role="status">
             <span className="mx-auto inline-flex h-14 w-14 items-center justify-center rounded-full bg-card text-review-ink"><Icon name="wifiOff" size={30} /></span>

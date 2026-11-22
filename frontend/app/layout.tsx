@@ -15,6 +15,7 @@ const nastaliq = Noto_Nastaliq_Urdu({
 export const metadata: Metadata = {
   title: "The Last Mile — AI on Public Rails",
   description: "PROTOTYPE — Simulated DPI & Synthetic Data Only. Urdu-first relief access.",
+  icons: { icon: [{ url: "/logo.png", type: "image/png", sizes: "192x192" }], apple: "/logo.png" },
 };
 
 export const viewport: Viewport = {

@@ -339,10 +339,36 @@ test("5 — helper mode switches families with PINs, updates banner and clears i
   let currentPin = familyPin(1);
   page.on("dialog", (d) => void d.accept(d.message().includes("PIN") ? currentPin : undefined));
 
+  // A citizen gives "my community helper may help me" and applies -> it surfaces in Helper Mode
+  const ct = await apiToken(request, "sindh.citizen");
+  const linked = await apiJson<{ helper_pin?: string }>(request, "POST", "/consents", ct, { scope: "helper_access" });
+  const schemes = await apiJson<{ id: number; code: string }[]>(request, "GET", "/schemes", ct);
+  const fresh = await apiJson<{ id: number; tenant_id: number }>(request, "POST", "/cases", ct, {
+    scheme_id: schemes.find((x) => x.code === "widow-relief")!.id, data: { full_name: "Helper Linked Applicant", monthly_income: 9000 },
+  });
+  const freshRef = `LM-${String(fresh.tenant_id).padStart(2, "0")}-${String(fresh.id).padStart(6, "0")}`;
+
   await english(page);
   await uiLogin(page, "sindh.helper", "/helper");
   const banner = page.getByTestId("family-banner");
   await expect(banner).toContainText("No family open");
+
+  const newBanner = page.getByTestId("helper-new-banner");
+  await expect(newBanner).toContainText(`New Citizen Application Linked:`);
+  await expect(newBanner).toContainText(freshRef);
+  await page.getByTestId("helper-lookup").fill(freshRef);
+  await page.getByRole("button", { name: "Find" }).click();
+  await expect(page.getByTestId("helper-lookup-result")).toContainText(`Found:`);
+  await expect(page.getByTestId("helper-lookup-result")).toContainText(freshRef);
+  if (linked.helper_pin) { // first link in this database: the one-time PIN opens the record
+    await page.locator("#family-pin").fill(linked.helper_pin);
+    await page.getByRole("button", { name: "Open" }).click();
+    await expect(banner).toContainText("consent");
+    await expect(banner).not.toContainText("no consent");
+    await page.getByRole("button", { name: /Switch/ }).click(); // back to the family list
+  }
+  await page.getByTestId("helper-new-dismiss").click();
+  await expect(newBanner).toBeHidden();
 
   async function openFamily(i: number) {
     currentPin = familyPin(i + 1);
@@ -442,6 +468,15 @@ test("7 — officer queue, consent take-back, admin Digital Twin + faults, audit
   await page.getByRole("button", { name: new RegExp(`#${c.id}\\b`) }).click();
   await expect(page.getByRole("heading", { name: new RegExp(`Case #${c.id}`) })).toBeVisible();
   await expect(page.getByText("Input vs OCR vs Registry")).toBeVisible();
+
+  // Approve -> a clear confirmation pop-up, and the queue card's badge updates at once
+  await page.getByRole("button", { name: "Approve" }).click();
+  const confirm = page.getByTestId("officer-decision-modal");
+  await expect(confirm).toBeVisible();
+  await expect(page.getByTestId("officer-decision-text")).toHaveText(`Application LM-01-${String(c.id).padStart(6, "0")} has been APPROVED by you.`);
+  await page.getByTestId("officer-decision-ok").click();
+  await expect(confirm).toBeHidden();
+  await expect(page.getByRole("button", { name: new RegExp(`#${c.id}\\b`) })).toContainText("OFFICER_APPROVED");
 
   // Citizen takes consent back in her own browser
   const citizen = await newEnglishPage(browser);

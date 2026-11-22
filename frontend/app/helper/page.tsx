@@ -6,20 +6,30 @@ import Icon from "@/components/Icon";
 import RequireRole from "@/components/RequireRole";
 import SpeakButton from "@/components/SpeakButton";
 import { PageShell, StatusPill } from "@/components/ui";
-import { api, ApiError, type Scheme } from "@/lib/api";
+import { api, ApiError, type Scheme, type Session } from "@/lib/api";
 import { useLang } from "@/lib/i18n";
 import { clearDraft } from "@/lib/offlineDb";
+import { useStorageValue, writeStorage } from "@/lib/stores";
 import { BUCKET_LABEL, STATUS_BUCKET, type Bucket } from "@/lib/status";
 
 interface Family { citizen_user_id: number; full_name: string; cnic_last4: string | null; consent: Record<string, boolean>; cases: number }
 interface Unlocked { citizen_user_id: number; full_name: string; cnic_last4: string | null; consent: Record<string, boolean>; can_act: boolean }
-interface CaseRow { id: number; status: string; citizen_user_id?: number; locked?: boolean }
+interface CaseRow { id: number; status: string; citizen_user_id?: number; locked?: boolean; created_at?: string | null; tenant_id?: number }
+interface LookupHit { citizen_user_id: number; full_name: string | null; cnic_last4: string | null; consent: boolean; case: { id: number; reference: string; status: string } | null }
+
+const NEW_WINDOW_MS = 72 * 3600 * 1000; // "newly linked" = submitted in the last 3 days and not yet acknowledged
+const ref = (tenant: number, id: number) => `LM-${String(tenant).padStart(2, "0")}-${String(id).padStart(6, "0")}`;
 
 const AUTO_LOCK_MS = 120_000;
 type Filter = "all" | Bucket | "none" | "locked";
 
-function HelperMode() {
+function HelperMode({ session }: { session: Session }) {
   const { lang, L } = useLang();
+  const seenKey = `lm.helperSeen.${session.user_id}`;
+  const seenRaw = useStorageValue(seenKey);
+  const [lookupQ, setLookupQ] = useState("");
+  const [lookupMsg, setLookupMsg] = useState<{ tone: "safe" | "review" | "danger"; text: string } | null>(null);
+  const [nowMs] = useState(() => Date.now());
   const [families, setFamilies] = useState<Family[]>([]);
   const [cases, setCases] = useState<CaseRow[]>([]);
   const [drawer, setDrawer] = useState(true);
@@ -117,6 +127,50 @@ function HelperMode() {
     if (b) counts[b] += 1;
   }
 
+  // Newly submitted, consented applications this helper has not acknowledged yet
+  const seen = new Set((seenRaw || "").split(",").filter(Boolean));
+  const famName = new Map(families.map((f) => [f.citizen_user_id, f.full_name]));
+  const fresh = cases.filter(
+    (c) => c.citizen_user_id !== undefined && !c.locked && !seen.has(String(c.id)) &&
+      !!c.created_at && nowMs - Date.parse(c.created_at.endsWith("Z") ? c.created_at : `${c.created_at}Z`) < NEW_WINDOW_MS &&
+      ["pending", "review"].includes(STATUS_BUCKET[c.status] || "review"),
+  );
+  const dismissFresh = () => writeStorage(seenKey, [...seen, ...fresh.map((c) => String(c.id))].join(","));
+
+  async function runLookup(e: React.FormEvent) {
+    e.preventDefault();
+    const q = lookupQ.trim();
+    if (!q) return;
+    setLookupMsg(null);
+    try {
+      const hit = await api<LookupHit>(`/helper/lookup?q=${encodeURIComponent(q)}`);
+      let fam = families.find((f) => f.citizen_user_id === hit.citizen_user_id);
+      if (!fam) {
+        const fresher = await api<Family[]>("/helper/families");
+        setFamilies(fresher);
+        fam = fresher.find((f) => f.citizen_user_id === hit.citizen_user_id);
+      }
+      if (!hit.consent) {
+        setLookupMsg({ tone: "review", text: L("Found a linked family, but they have not given helper permission yet.", "منسلک خاندان ملا، لیکن انہوں نے ابھی مددگار کو اجازت نہیں دی۔") });
+      } else {
+        const what = `${hit.full_name}${hit.case ? ` / ${hit.case.reference}` : ""}`;
+        setLookupMsg({ tone: "safe", text: L(`Found: ${what}. Ask the family to type their PIN below.`, `مل گیا: ${what}۔ خاندان سے کہیں کہ نیچے اپنا پن لکھیں۔`) });
+      }
+      if (fam) {
+        setPinFor(fam);
+        setPin("");
+        setErr(null);
+      }
+    } catch (ex) {
+      setLookupMsg({
+        tone: "danger",
+        text: ex instanceof ApiError && ex.status === 404
+          ? L("No consented family linked to you matches that CNIC or Application ID.", "اس شناختی کارڈ یا درخواست آئی ڈی سے آپ سے منسلک کوئی خاندان نہیں ملا۔")
+          : L("Lookup failed — check the connection and try again.", "تلاش ناکام — کنکشن دیکھ کر دوبارہ کوشش کریں۔"),
+      });
+    }
+  }
+
   const shown = families.filter(
     (f) => `${f.full_name} ${f.cnic_last4}`.toLowerCase().includes(query.toLowerCase()) && (filter === "all" || familyFilter(f) === filter),
   );
@@ -149,6 +203,38 @@ function HelperMode() {
         </div>
         <SpeakButton text="خاندان کو ان کے پن سے کھولیں، پھر ان کی طرف سے درخواست دیں۔" textEn="Open a family with their PIN, then apply on their behalf." size="lg" />
       </div>
+
+      {fresh.length > 0 && (
+        <div data-testid="helper-new-banner" role="status" className="mb-4 rounded-2xl border-2 border-brand bg-tint p-4 text-brand">
+          <div className="flex items-start gap-3">
+            <Icon name="bell" size={26} className="mt-1 shrink-0" />
+            <div className="min-w-0 flex-1 space-y-1">
+              {fresh.slice(0, 3).map((c) => {
+                const what = `${famName.get(c.citizen_user_id!) || "—"} / ${ref(c.tenant_id ?? session.tenant_id, c.id)}`;
+                return (
+                  <p key={c.id} className="text-lg font-bold">
+                    {L(`New Citizen Application Linked: ${what} is now available in your Helper session.`,
+                      `نئی شہری درخواست شامل ہو گئی ہے: ${what} اب آپ کے مددگار سیشن میں موجود ہے۔`)}
+                  </p>
+                );
+              })}
+              {fresh.length > 3 && <p className="text-base">{L(`+${fresh.length - 3} more`, `مزید ${fresh.length - 3}`)}</p>}
+            </div>
+            <button type="button" onClick={dismissFresh} data-testid="helper-new-dismiss" aria-label={L("Dismiss", "بند کریں")} className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl hover:bg-white">
+              <Icon name="x" size={22} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      <form onSubmit={runLookup} className="card mb-4 p-3" role="search">
+        <label htmlFor="helper-lookup" className="block text-lg font-bold text-brand">{L("Lookup Consented Application by CNIC or App ID", "شناختی کارڈ یا درخواست آئی ڈی سے تلاش کریں")}</label>
+        <div className="mt-2 flex gap-2">
+          <input id="helper-lookup" data-testid="helper-lookup" dir="ltr" value={lookupQ} onChange={(e) => setLookupQ(e.target.value)} placeholder="42101-1234567-1 / LM-01-000034" className="field min-w-0 flex-1 font-mono text-lg" />
+          <button type="submit" className="btn btn-primary shrink-0"><Icon name="search" size={20} /> <span className="hidden sm:inline">{L("Find", "تلاش")}</span><span className="sr-only sm:hidden">{L("Find", "تلاش")}</span></button>
+        </div>
+        {lookupMsg && <p data-testid="helper-lookup-result" role="status" className={`panel-${lookupMsg.tone} mt-2 rounded-xl p-3 text-base font-bold`}>{lookupMsg.text}</p>}
+      </form>
 
       <div className="mb-4 grid grid-cols-2 gap-2 md:grid-cols-4">
         {tile(L("Total families assisted", "کل خاندان"), families.length, "bg-tint text-brand", "users")}
@@ -267,7 +353,7 @@ export default function HelperPage() {
   const { L } = useLang();
   return (
     <PageShell title={L("Helper mode", "مددگار موڈ")}>
-      <RequireRole roles={["community_helper"]}>{() => <HelperMode />}</RequireRole>
+      <RequireRole roles={["community_helper"]}>{(s) => <HelperMode key={s.user_id} session={s} />}</RequireRole>
     </PageShell>
   );
 }

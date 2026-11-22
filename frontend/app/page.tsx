@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import AppHeader from "@/components/AppHeader";
+import BrandLogo from "@/components/BrandLogo";
 import Icon, { type IconName } from "@/components/Icon";
 import SpeakButton from "@/components/SpeakButton";
 import { isStaff, PORTAL, ROLE_LABEL, useSession } from "@/lib/api";
@@ -43,6 +44,7 @@ export default function Home() {
         )}
         {/* Compact hero: one headline + one sentence, so the 4 service cards sit above the fold */}
         <div className="flex items-start gap-3">
+          <span className="hidden min-[380px]:block"><BrandLogo size="h-14 w-14 sm:h-16 sm:w-16" padding="p-1.5" /></span>
           <div className="min-w-0 flex-1">
             <h1 data-testid="hero-title" className="urdu-title text-xl leading-tight font-bold text-brand sm:text-3xl">
               {L("Government assistance, made simple", "سرکاری امداد، اب نہایت آسان")}

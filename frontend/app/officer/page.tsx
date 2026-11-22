@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Icon from "@/components/Icon";
 import { PageShell } from "@/components/ui";
 import RequireRole from "@/components/RequireRole";
-import { api, ApiError } from "@/lib/api";
+import SpeakButton from "@/components/SpeakButton";
+import { api, ApiError, type Session } from "@/lib/api";
 
 interface QItem { case_id: number; status: string; probability: number; flags: string[]; locked: boolean; applicant_name: string | null; reason_user_en: string | null }
 interface DiffRow { field: string; input: unknown; ocr: unknown; registry: unknown; mismatch: boolean }
@@ -19,7 +20,42 @@ interface Review {
 
 const ROUTE_PILL: Record<string, string> = { ESCALATE_HUMAN: "pill-review", ASK_MORE_PROOF: "pill-review", AUTO_RECOMMEND: "pill-safe", OFFICER_REQUESTED_PROOF: "pill-review", OFFICER_APPROVED: "pill-safe", PAID: "pill-safe", OFFICER_REJECTED: "pill-danger" };
 
-function Workspace() {
+function DecisionConfirm({ d, onClose }: { d: { action: "approve" | "reject"; reference: string; reason: string }; onClose: () => void }) {
+  const okRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => okRef.current?.focus(), []);
+  const approved = d.action === "approve";
+  const en = approved
+    ? `Application ${d.reference} has been APPROVED by you.`
+    : `Application ${d.reference} has been REJECTED by you. Reason: ${d.reason}.`;
+  const ur = approved
+    ? `درخواست (${d.reference}) آپ کی جانب سے منظور کر لی گئی ہے۔`
+    : `درخواست (${d.reference}) آپ کی جانب سے مسترد کر دی گئی ہے۔`;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/60 p-4" onKeyDown={(e) => e.key === "Escape" && onClose()}>
+      <div role="dialog" aria-modal="true" aria-labelledby="officer-decision-title" data-testid="officer-decision-modal" data-action={d.action}
+        className={`w-full max-w-lg overflow-hidden rounded-2xl border-2 shadow-xl ${approved ? "border-brand bg-tint" : "border-danger-line bg-danger-bg"}`}>
+        <div className={`flex items-center gap-2 px-5 py-3 text-white ${approved ? "bg-brand" : "bg-danger-ink"}`}>
+          <Icon name={approved ? "checkCircle" : "x"} size={26} />
+          <h2 id="officer-decision-title" className="text-xl font-bold">{approved ? "Approved" : "Rejected"}</h2>
+        </div>
+        <div className="flex items-start gap-3 p-5">
+          <div className={`min-w-0 flex-1 ${approved ? "text-brand" : "text-danger-ink"}`}>
+            <p data-testid="officer-decision-text" className="text-lg font-bold">{en}</p>
+            <p dir="rtl" lang="ur" className="urdu mt-2 text-lg">{ur}</p>
+          </div>
+          <SpeakButton text={ur} textEn={en} label="Listen to the decision" />
+        </div>
+        <div className="px-5 pb-5">
+          <button ref={okRef} type="button" onClick={onClose} data-testid="officer-decision-ok" className="btn btn-primary w-full text-xl">
+            OK / <span className="urdu">ٹھیک ہے</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Workspace({ session }: { session: Session }) {
   const [queue, setQueue] = useState<QItem[]>([]);
   const [review, setReview] = useState<Review | null>(null);
   const [reason, setReason] = useState("");
@@ -27,6 +63,7 @@ function Workspace() {
   const [showClosed, setShowClosed] = useState(false);
   const [loadState, setLoadState] = useState<"loading" | "ready" | "error">("loading");
   const [loadErr, setLoadErr] = useState<string | null>(null);
+  const [confirmed, setConfirmed] = useState<{ action: "approve" | "reject"; reference: string; reason: string } | null>(null);
 
   // Never fail silently: a cold-starting free-tier API or a network blip used to leave an empty "Queue empty." list.
   // Retry a few times with back-off, then show the real error with a Retry button.
@@ -68,10 +105,15 @@ function Workspace() {
   async function act(action: "approve" | "request_proof" | "reject") {
     if (!review) return;
     try {
-      await api(`/cases/${review.case_id}/officer-action`, { body: { action, reason } });
+      const id = review.case_id;
+      const d = await api<{ route: string }>(`/cases/${id}/officer-action`, { body: { action, reason } });
+      // Reflect the new status on the queue card right away (no reload that would drop the now-closed case)
+      setQueue((q) => q.map((it) => (it.case_id === id ? { ...it, status: d.route } : it)));
       setMsg(`Recorded: ${action}`);
-      await open(review.case_id);
-      await load(showClosed);
+      if (action !== "request_proof") {
+        setConfirmed({ action, reference: `LM-${String(session.tenant_id).padStart(2, "0")}-${String(id).padStart(6, "0")}`, reason: reason.trim() });
+      }
+      await open(id);
     } catch (e) {
       setMsg(e instanceof ApiError ? e.message : String(e));
     }
@@ -90,6 +132,7 @@ function Workspace() {
 
   return (
     <div className="grid gap-4 lg:grid-cols-[22rem_1fr]" dir="ltr">
+      {confirmed && <DecisionConfirm d={confirmed} onClose={() => setConfirmed(null)} />}
       <aside className="card h-fit p-3">
         <h2 className="text-xl font-bold text-brand">Queue (lowest confidence first)</h2>
         <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -210,7 +253,7 @@ export default function OfficerPage() {
   return (
     <PageShell title="Officer" width="full">
       {/* keyed by account: no queue/review state can survive a logout + login as someone else */}
-      <RequireRole roles={["department_officer"]}>{(s) => <Workspace key={s.user_id} />}</RequireRole>
+      <RequireRole roles={["department_officer"]}>{(s) => <Workspace key={s.user_id} session={s} />}</RequireRole>
     </PageShell>
   );
 }

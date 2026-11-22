@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import BrandLogo from "@/components/BrandLogo";
 import DecisionModal from "@/components/DecisionModal";
 import Icon from "@/components/Icon";
 import { FLASH_KEY, logoutAndGoHome, PORTAL, ROLE_LABEL, useSession } from "@/lib/api";
@@ -69,9 +70,7 @@ export default function AppHeader({ title }: { title?: string }) {
     <header className="sticky top-0 z-40 bg-brand text-white shadow-sm">
       <div className="mx-auto flex max-w-6xl items-center gap-2 px-3 pt-1.5">
         <Link href="/" className="flex min-h-[44px] items-center gap-2 rounded-xl pe-2 text-xl font-bold whitespace-nowrap">
-          <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-gold text-ink" aria-hidden>
-            <Icon name="shield" size={22} />
-          </span>
+          <BrandLogo />
           <span dir="ltr" className="inline-block">The Last Mile</span>
         </Link>
         {title && <span className="hidden truncate text-lg text-white/80 md:inline">· {title}</span>}

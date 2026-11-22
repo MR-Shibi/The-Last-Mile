@@ -20,11 +20,17 @@ function PrivacyCenter() {
   const active = Object.fromEntries(consents.filter((c) => c.active).map((c) => [c.scope, true]));
 
   async function toggle(scope: string, on: boolean) {
-    if (on) await api("/consents", { body: { scope } });
+    let pin: string | undefined;
+    if (on) pin = (await api<{ helper_pin?: string }>("/consents", { body: { scope } })).helper_pin;
     else {
       for (const c of consents.filter((x) => x.scope === scope && x.active)) await api(`/consents/${c.id}`, { method: "DELETE" });
     }
-    setMsg(on ? L("Permission given.", "اجازت دے دی گئی۔") : L("Access withdrawn. Nobody can see this from now on.", "اجازت واپس لے لی گئی۔ اب کوئی یہ نہیں دیکھ سکتا۔"));
+    setMsg(
+      pin
+        ? L(`Permission given. Your community helper is now linked — tell them this family PIN in person (shown once): ${pin}`,
+            `اجازت دے دی گئی۔ آپ کی کمیونٹی مددگار شامل ہو گئی — یہ خاندانی پن انہیں خود بتائیں (صرف ایک بار): ${pin}`)
+        : on ? L("Permission given.", "اجازت دے دی گئی۔") : L("Access withdrawn. Nobody can see this from now on.", "اجازت واپس لے لی گئی۔ اب کوئی یہ نہیں دیکھ سکتا۔"),
+    );
     await load();
   }
 

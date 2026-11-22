@@ -179,6 +179,23 @@ def _link_helper(citizen_id: int) -> None:
         db.commit()
 
 
+_UNLINKED_HELPER: dict = {}
+
+
+def _unlinked_helper_headers() -> dict:
+    """A second Sindh community helper who is linked to no family (created once per eval run)."""
+    if not _UNLINKED_HELPER:
+        from app.services.seed import _user
+
+        with SessionLocal() as db:
+            tenant = db.get(Tenant, ctx_tenant(db))
+            u = _user(db, tenant, "sindh.helper.unlinked", Role.HELPER, "Sindh Unlinked Helper")
+            db.commit()
+            tok = create_tokens(u.id, u.tenant_id, u.role)["access_token"]
+        _UNLINKED_HELPER["h"] = {"Authorization": f"Bearer {tok}"}
+    return _UNLINKED_HELPER["h"]
+
+
 def ctx_tenant(db) -> int:  # noqa: ANN001
     return db.execute(select(Tenant.id).where(Tenant.code == "sindh-spd")).scalar()
 
@@ -199,8 +216,10 @@ def run_consent(ctx: Ctx, c: dict) -> dict:
         client.delete(f"/consents/{cid}", headers=who["h"])
         code = client.get(f"/cases/{case['id']}", headers=off).status_code
     elif mode == "helper_unlinked":
+        # The citizen's helper_access consent links them to their own community helper; a DIFFERENT helper in the
+        # same department, never linked to this family, must still be refused.
         client.post("/consents", headers=who["h"], json={"scope": "helper_access"})
-        code = client.get(f"/cases/{case['id']}", headers=hlp).status_code
+        code = client.get(f"/cases/{case['id']}", headers=_unlinked_helper_headers()).status_code
     elif mode == "helper_linked_no_consent":
         _link_helper(who["id"])
         code = client.get(f"/cases/{case['id']}", headers=hlp).status_code
